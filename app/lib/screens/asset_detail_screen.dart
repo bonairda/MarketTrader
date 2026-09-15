@@ -88,7 +88,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
         actions: [
           IconButton(
             onPressed: _openCreateAlert,
-            icon: const Icon(Icons.notifications_add),
+            icon: const Icon(Icons.add_alert),
             tooltip: 'Crear alerta de precio',
           ),
         ],
