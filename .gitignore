@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Entorno
+.env
+
+# Datos locales
+*.sqlite3
+pgdata/
+redisdata/
+
+# IDE
+.vscode/
+.idea/
