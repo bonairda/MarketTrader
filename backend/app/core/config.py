@@ -19,6 +19,8 @@ class Settings(BaseSettings):
 
     # API
     log_level: str = "INFO"
+    # Orígenes permitidos para CORS (separados por coma). "*" permite todos.
+    cors_origins: str = "*"
 
     # Ingestión
     crypto_ws_url: str = "wss://stream.binance.com:9443/ws"
@@ -28,6 +30,10 @@ class Settings(BaseSettings):
     # en el log pero no se envían.
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
+
+    # Watchdog de ingestión: si no llega ningún tick en este tiempo (segundos),
+    # el worker avisa por Telegram de que la ingestión puede estar caída.
+    ingestion_stale_seconds: int = 120
 
     @property
     def database_url(self) -> str:
@@ -43,6 +49,10 @@ class Settings(BaseSettings):
     @property
     def crypto_symbols(self) -> list[str]:
         return [s.strip() for s in self.default_crypto_symbols.split(",") if s.strip()]
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 
 settings = Settings()

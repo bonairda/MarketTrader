@@ -102,20 +102,47 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 - [ ] Cartera/posiciones (manual/simulado).
 - [ ] Autenticación (JWT), roles (OWNER/ANALYST/VIEWER), multiusuario.
 
-## 5. Posibles mejoras posteriores (deuda técnica / calidad)
+## 5. Consolidación de la base (Bloques A, B y C — hechos)
 
-- **Migraciones con Alembic**: hoy el esquema se crea con DDL en `db.py`. Migrar a
-  Alembic cuando el modelo se estabilice.
-- **Tests**: no hay tests aún. Añadir unitarios (agregador de velas, parser de
-  Binance, repositorios) y de integración cuando haya más lógica.
-- **ORM en vez de SQL crudo**: los repositorios usan `text()`. Valorar modelos
-  SQLAlchemy declarativos si el modelo crece.
+Trabajo de robustez y calidad aplicado sobre F0/F1 para tener una base estable y escalable.
+
+### Bloque A — Correctitud
+- [x] **Migraciones con Alembic**: esquema en `alembic/versions/` (migración 0001 con
+  hypertable). Modelos declarativos en `core/models.py`. El servicio `migrate` de
+  docker-compose aplica `alembic upgrade head` antes de arrancar api/worker.
+- [x] **Agregador de velas robusto**: `flush_stale` (cierra velas vencidas aunque no
+  lleguen ticks) + `flush_all` (persiste la vela en curso al apagar). Worker con tarea
+  de mantenimiento concurrente.
+- [x] **Estado de alertas en Redis**: `last_price` y cooldown fuera de memoria;
+  cooldown atómico con `SET NX EX` (anti-duplicados, multi-worker, sobrevive reinicios).
+- [x] **Tests** (`tests/`): parser de Binance, agregador de velas y motor de alertas
+  (con `fakeredis`). Ejecutar con `pytest`.
+
+### Bloque B — Robustez API / operativa
+- [x] **CORS** configurable (`CORS_ORIGINS`).
+- [x] **Healthcheck real** (`GET /health`): comprueba BD y Redis; devuelve 503 si falla.
+- [x] **Errores centralizados** (`core/errors.py`): respuestas consistentes y sin filtrar
+  trazas al cliente.
+- [x] **Watchdog de ingestión**: avisa por Telegram si no llegan ticks en X segundos
+  (`INGESTION_STALE_SECONDS`), y se rearma al recuperarse.
+- [x] **WebSocket gateway con broadcaster**: una sola suscripción a Redis por proceso y
+  fan-out en memoria a los clientes (escala con muchos clientes; backpressure por cola).
+
+### Bloque C — Tooling / calidad
+- [x] **ruff + black** configurados en `pyproject.toml`.
+- [x] **CI en GitHub Actions** (`.github/workflows/ci.yml`): lint + tests del backend y
+  `flutter analyze` de la app en cada push/PR.
+
+## 6. Mejoras pendientes (deuda técnica / calidad)
+
+- **ORM en vez de SQL crudo**: los repositorios aún usan `text()`. Los modelos
+  declarativos ya existen (`core/models.py`); migrar los repos a ORM cuando compense.
 - **Backpressure**: el worker procesa tick a tick; si un símbolo es muy activo,
   valorar batching de escritura a Redis.
-- **Observabilidad**: métricas (Prometheus) y watchdog que avise a Telegram si la
-  ingestión deja de recibir datos.
+- **Observabilidad**: métricas (Prometheus).
 - **Seguridad**: la API no tiene auth todavía (uso personal local). Antes de exponerla,
   añadir JWT + HTTPS + rate limiting.
+- **FCM (push móvil)**: hoy las alertas van por Telegram.
 - **Config del universo**: hoy el worker lee la watchlist al arrancar; conviene un
   canal (Redis pub/sub) para resuscribir en caliente.
 - **Múltiples intervalos de vela**: hoy solo 1m; añadir 5m/1h/1d por agregación.

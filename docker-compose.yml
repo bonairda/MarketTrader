@@ -41,6 +41,19 @@ services:
       timeout: 5s
       retries: 5
 
+  # Aplica las migraciones de Alembic una vez y termina. api/worker esperan a que
+  # complete correctamente antes de arrancar.
+  migrate:
+    build: ./backend
+    command: ["alembic", "upgrade", "head"]
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 256m
+    restart: "no"
+
   api:
     build: ./backend
     restart: unless-stopped
@@ -54,6 +67,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     mem_limit: 512m
 
   worker:
@@ -67,6 +82,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     mem_limit: 512m
 
 volumes:
