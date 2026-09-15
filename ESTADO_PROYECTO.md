@@ -49,8 +49,12 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
   - `aggregator.py`: construye velas de 1m en memoria y las persiste al cerrarse.
   - `routes.py`: endpoints de precios en vivo y velas.
 - **modules/watchlists/**: repositorio + endpoints (define el universo suscrito).
+- **modules/alerts/**: `repository.py` (CRUD de reglas), `engine.py` (evaluación por tick con
+  detección de cruce + cooldown) y `routes.py` (API).
+- **modules/notifications/**: `telegram.py` (envío por bot de Telegram; si no está configurado,
+  solo registra en log).
 - **main.py**: API FastAPI con `/health` y routers de módulos.
-- **worker.py**: ingestión (watchlist -> Redis + agregador de velas).
+- **worker.py**: ingestión (watchlist -> Redis + agregador de velas + motor de alertas).
 
 ### Decisiones de diseño ya materializadas en el código
 - Los **ticks NO se persisten**: van a Redis; a la BD solo velas cerradas.
@@ -63,14 +67,22 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 - `GET /market/prices` — precios en vivo de la watchlist
 - `GET /market/prices/{symbol}`
 - `GET /market/bars/{symbol}?interval=1m&limit=200`
+- `WS  /market/ws` — stream de precios en vivo (Redis pub/sub -> WebSocket)
 - `GET /watchlist` · `POST /watchlist` · `DELETE /watchlist/{asset_id}`
+- `GET /alerts` · `POST /alerts` · `PUT /alerts/{id}/enabled` · `DELETE /alerts/{id}`
 
 ## 4. Desarrollos pendientes
 
 ### F1 (para cerrar el MVP)
-- [ ] Módulo de **alertas**: evaluación de reglas de precio + envío push (FCM) o Telegram.
-- [ ] **WebSocket gateway** para empujar precios en vivo a la app (hoy solo REST).
-- [ ] **Cliente Flutter**: pantalla de watchlist en vivo + detalle de activo con velas.
+- [x] **Cliente Flutter** (ordenador + móvil + web): watchlist en vivo (polling REST) + detalle de activo con velas.
+      Carpeta `app/` (solo `lib/` + `pubspec.yaml`; las plataformas se generan con `flutter create .`).
+- [x] **WebSocket gateway** (`GET /market/ws`): el worker publica ticks en Redis pub/sub
+      (`live:ticks`) y el gateway los reenvía a los clientes. La app se conecta por WS con
+      reconexión automática y usa polling REST solo como respaldo.
+- [x] Módulo de **alertas**: reglas de cruce de precio evaluadas en el worker por cada tick
+      (detecta cruce, no nivel; con cooldown por regla), notificación por **Telegram**, y CRUD por API.
+      La app permite crear alertas desde el detalle del activo. El worker recarga reglas cada 30 s.
+- [ ] **FCM (push móvil)**: hoy las alertas van por Telegram. FCM requiere proyecto Firebase + credenciales.
 - [ ] Backfill histórico de velas al añadir un activo a la watchlist.
 - [ ] Recargar suscripciones del worker cuando cambia la watchlist (hoy se leen al arrancar).
 

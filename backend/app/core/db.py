@@ -54,9 +54,11 @@ _SCHEMA_STATEMENTS = [
     CREATE TABLE IF NOT EXISTS alert_rules (
         id          TEXT PRIMARY KEY,
         asset_id    TEXT NOT NULL,
-        type        TEXT NOT NULL,
-        threshold   DOUBLE PRECISION,
-        channels    TEXT NOT NULL DEFAULT 'PUSH',
+        type        TEXT NOT NULL DEFAULT 'PRICE_CROSS',
+        direction   TEXT NOT NULL DEFAULT 'ABOVE',
+        threshold   DOUBLE PRECISION NOT NULL,
+        channels    TEXT NOT NULL DEFAULT 'TELEGRAM',
+        cooldown_seconds INTEGER NOT NULL DEFAULT 300,
         enabled     BOOLEAN NOT NULL DEFAULT TRUE,
         last_triggered_at TIMESTAMPTZ
     )

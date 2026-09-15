@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     crypto_ws_url: str = "wss://stream.binance.com:9443/ws"
     default_crypto_symbols: str = "btcusdt,ethusdt"
 
+    # Notificaciones (Telegram). Si no se configuran, las alertas se registran
+    # en el log pero no se envían.
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+
     @property
     def database_url(self) -> str:
         return (
