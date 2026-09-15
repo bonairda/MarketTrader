@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.core.logging import get_logger
 from app.modules.market_data import bars
@@ -84,18 +84,16 @@ class BarAggregator:
         self._building.clear()
 
     async def _flush(self, symbol: str, bar: _Building) -> None:
-        open_time = datetime.fromtimestamp(
-            bar.minute * _SECONDS_PER_MINUTE, tz=timezone.utc
-        )
+        open_time = datetime.fromtimestamp(bar.minute * _SECONDS_PER_MINUTE, tz=UTC)
         try:
             await bars.upsert_bar(
                 asset_id=symbol,
                 interval=_INTERVAL,
                 open_time=open_time,
-                o=bar.open,
-                h=bar.high,
-                l=bar.low,
-                c=bar.close,
+                open_=bar.open,
+                high=bar.high,
+                low=bar.low,
+                close=bar.close,
             )
         except Exception as exc:  # no romper la ingestión por un fallo de BD
             log.error("[DB] Error guardando vela de %s: %s", symbol, exc)

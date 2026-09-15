@@ -1,6 +1,6 @@
 """Tests del agregador de velas de 1 minuto."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -13,16 +13,16 @@ def captured(monkeypatch):
     """Captura las velas que el agregador intenta persistir (sin tocar la BD)."""
     saved: list[dict] = []
 
-    async def fake_upsert(asset_id, interval, open_time, o, h, l, c, volume=None):
+    async def fake_upsert(asset_id, interval, open_time, open_, high, low, close, volume=None):
         saved.append(
             {
                 "asset_id": asset_id,
                 "interval": interval,
                 "open_time": open_time,
-                "open": o,
-                "high": h,
-                "low": l,
-                "close": c,
+                "open": open_,
+                "high": high,
+                "low": low,
+                "close": close,
             }
         )
 
@@ -53,7 +53,7 @@ async def test_ohlc_within_same_minute(captured):
     assert bar["high"] == 15
     assert bar["low"] == 8
     assert bar["close"] == 12
-    assert bar["open_time"] == datetime.fromtimestamp(100 * 60, tz=timezone.utc)
+    assert bar["open_time"] == datetime.fromtimestamp(100 * 60, tz=UTC)
 
 
 async def test_rollover_opens_new_candle(captured):

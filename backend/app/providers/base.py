@@ -7,8 +7,8 @@ resto de la aplicación no dependa de ningún proveedor concreto.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import AsyncIterator
 
 
 @dataclass
