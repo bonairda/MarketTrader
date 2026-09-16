@@ -1,7 +1,7 @@
 # Estado del proyecto — MarketTracker
 
 > Documento de contexto para retomar el proyecto en cualquier momento.
-> Última actualización: F5 completa (autenticación, usuarios/roles y filtrado por usuario).
+> Última actualización: F6 completa (operaciones, auditoría e informe fiscal FIFO).
 
 ## 1. Resumen
 
@@ -18,14 +18,15 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 ## 2. Estado por fases
 
 | Fase | Descripción | Estado |
-|------|-------------|--------|
+| --- | --- | --- |
 | F0 | Cimientos (repos, Docker, esqueleto backend) + consolidación (bloques A/B/C) | Completa |
 | F1 | MVP: cripto en vivo + watchlist + velas + alertas + app | Completa |
 | F2 | Acciones/forex, indicadores, dashboard, tipos de alerta | Completa |
 | F3 | Señales, riesgo, mercados llamativos | Completa |
 | F4 | Backtesting, cartera/simulación | Completa |
 | F5 | Autenticación (JWT), usuarios/roles, filtro por usuario en toda la BD | Completa |
-| F6 | Operaciones + fiscalidad (Hacienda, FIFO); integración broker (Alpaca) | Pendiente |
+| F6 | Operaciones, trazabilidad e informe fiscal FIFO en EUR | Completa |
+| F7 | Importación de brokers y Alpaca paper trading | Pendiente |
 
 ## 3. Apartados implementados
 
@@ -66,10 +67,10 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 ### Endpoints disponibles
 
 > Desde F5, **todos los endpoints requieren token JWT** (cabecera
-> `Authorization: Bearer <token>`) salvo `GET /health`, `POST /auth/register`,
-> `POST /auth/login` y el WebSocket `WS /market/ws` (solo emite ticks públicos).
-> Los endpoints de datos personales (watchlist, alertas, cartera, dashboard,
-> precios) filtran SIEMPRE por el `user_id` del token.
+> `Authorization: Bearer <token>`) salvo `GET /health`, `POST /auth/register` y
+> `POST /auth/login`. El WebSocket usa el mismo JWT en `WS /market/ws?token=...`
+> y filtra el stream por la watchlist del usuario. Los endpoints de datos
+> personales filtran SIEMPRE por el `user_id` del token.
 
 - `GET /health`
 - `POST /auth/register` · `POST /auth/login` · `GET /auth/me` — autenticación (F5)
@@ -82,7 +83,10 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 - `GET /backtest/{symbol}?interval=1m&limit=1000` — métricas de la estrategia sobre velas (F4)
 - `GET /portfolio` — posiciones valoradas con precio en vivo + resumen P&L (F4)
 - `POST /portfolio/positions` · `DELETE /portfolio/positions/{id}` — CRUD de posiciones (F4)
-- `WS  /market/ws` — stream de precios en vivo (Redis pub/sub -> WebSocket)
+- `GET /operations` · `POST /operations` · `GET/DELETE /operations/{id}` — libro fiscal (F6)
+- `GET /operations/audit` — trazabilidad inmutable de altas y bajas (F6)
+- `GET /tax/reports/{year}` · `GET /tax/reports/{year}/csv` — informe FIFO en EUR (F6)
+- `WS  /market/ws?token=<jwt>` — precios de la watchlist del usuario
 - `GET /watchlist` · `POST /watchlist` · `DELETE /watchlist/{asset_id}`
 - `GET /alerts` · `POST /alerts` · `PUT /alerts/{id}/enabled` · `DELETE /alerts/{id}`
 
@@ -185,16 +189,37 @@ Pendiente futuro (no bloquea F1):
       `SharedPreferences`, envío automático de `Authorization: Bearer` en todas las
       llamadas, y gate de sesión (splash -> login o app). Botón de cerrar sesión.
 
-### F6 — PENDIENTE (siguiente)
-- [ ] **Módulo de operaciones + fiscalidad (Hacienda)**: registrar compras/ventas
-      (manuales o importadas) sobre la cartera, con cálculo de plusvalías por
-      **FIFO** en EUR (incluyendo divisa y tipo de cambio), y export anual para la
-      declaración. Base para la trazabilidad fiscal.
-- [ ] **Integración con broker (opcional)**: **Alpaca** en modo *paper trading*
-      primero (sin dinero real), y solo después operativa real con confirmación
-      explícita por orden. Las entidades citadas (CaixaBank, Revolut, Trade Republic)
-      **no ofrecen API de trading para terceros**, así que con ellas la vía es
-      importar/registrar las operaciones manualmente.
+### F6 — COMPLETA
+- [x] **Libro de operaciones por usuario** (`operations`): compras y ventas con
+      fecha fiscal, cantidad, precio/bruto/comisión en divisa original, cambio a
+      EUR, fuente del cambio, origen externo y notas. Importes `NUMERIC/Decimal`,
+      constraints en BD e idempotencia por `(user_id, source, external_id)`.
+- [x] **Motor FIFO fiscal puro**: consume los lotes más antiguos sin redondeo
+      prematuro, incorpora comisiones de compra al coste, resta las de venta de la
+      transmisión, admite ventas parciales/multilote y cambios de divisa distintos.
+      Rechaza ventas sin saldo con 409.
+- [x] **Consistencia concurrente**: alta/baja y validación FIFO dentro de una única
+      transacción, con advisory lock PostgreSQL por usuario y activo. Borrar una
+      compra que deje una venta posterior sin saldo se rechaza.
+- [x] **Trazabilidad**: `operation_audit_log` conserva snapshots inmutables de cada
+      alta y baja. `GET /operations/audit` solo devuelve eventos del usuario.
+- [x] **Informe anual**: JSON y CSV (BOM UTF-8, separador `;`) generados desde el
+      mismo resultado FIFO, una fila por emparejamiento, con compras de años previos.
+- [x] **App Flutter**: cuarta pestaña Operaciones, formulario manual, borrado
+      controlado, informe por ejercicio y copia del CSV al portapapeles.
+- [x] **Tests**: precisión Decimal, fees, divisas, multilote, saldo insuficiente,
+      orden temporal, ejercicios, validaciones, aislamiento y equivalencia JSON/CSV.
+
+> El informe es un borrador informativo. No sustituye asesoramiento fiscal ni
+> implementa todavía todas las reglas AEAT (por ejemplo, recompra de valores
+> homogéneos y diferimiento de pérdidas).
+
+### F7 — PENDIENTE
+- [ ] Importadores CSV para brokers sin API pública (CaixaBank, Revolut,
+      Trade Republic), con previsualización y deduplicación por `external_id`.
+- [ ] **Alpaca paper trading** (sin dinero real), reconciliación de ejecuciones y
+      confirmación explícita. La operativa real solo después de revisión legal y de seguridad.
+- [ ] Cartera derivada del libro fiscal y valoración multidivisa en EUR.
 - [ ] Roles adicionales y producto comercial multiusuario.
 
 ## 5. Consolidación de la base (Bloques A, B y C — hechos)
@@ -225,8 +250,9 @@ Trabajo de robustez y calidad aplicado sobre F0/F1 para tener una base estable y
 
 ### Bloque C — Tooling / calidad
 - [x] **ruff + black** configurados en `pyproject.toml`.
-- [x] **CI en GitHub Actions** (`.github/workflows/ci.yml`): lint + tests del backend y
-  `flutter analyze` de la app en cada push/PR.
+- [x] **CI en GitHub Actions** (`.github/workflows/ci.yml`): Ruff + tests unitarios,
+  migraciones y prueba concurrente contra Timescale/PostgreSQL real, build de imagen,
+  `flutter analyze` y `flutter test` en cada push/PR.
 
 ## 6. Mejoras pendientes (deuda técnica / calidad)
 
@@ -235,16 +261,19 @@ Trabajo de robustez y calidad aplicado sobre F0/F1 para tener una base estable y
 - **Backpressure**: el worker procesa tick a tick; si un símbolo es muy activo,
   valorar batching de escritura a Redis.
 - **Observabilidad**: métricas (Prometheus).
-- **Seguridad**: la API ya tiene **auth JWT** (F5). Pendiente antes de exponerla a
-  Internet: **HTTPS**, **rate limiting** y rotar `JWT_SECRET` (por variable de entorno;
-  el valor por defecto es solo para desarrollo). El WebSocket `/market/ws` aún no
-  autentica (solo emite ticks públicos); añadir token por query param si se quiere cerrar.
+- **Seguridad**: la API y el WebSocket tienen auth JWT. Antes de exponer a
+  Internet: **HTTPS**, **rate limiting**, rotación de `JWT_SECRET` y sustituir el
+  token largo en query WebSocket por un ticket efímero. Migrar el token Flutter de
+  `SharedPreferences` a almacenamiento seguro nativo.
+- **Notificaciones por usuario**: las reglas ya tienen `user_id`, pero Telegram
+  sigue configurado globalmente; falta guardar canales/credenciales por usuario.
 - **FCM (push móvil)**: hoy las alertas van por Telegram.
-- **Config del universo**: hoy el worker lee la watchlist al arrancar; conviene un
-  canal (Redis pub/sub) para resuscribir en caliente.
+- **Escalado del universo**: la resuscripción en caliente ya funciona; si crece
+  mucho el número de usuarios, añadir referencias por símbolo para evitar reiniciar
+  streams de proveedor ante cada cambio individual.
 - **Múltiples intervalos de vela**: hoy solo 1m; añadir 5m/1h/1d por agregación.
 
-## 6. Cómo arrancar
+## 7. Cómo arrancar
 
 ```bash
 cd market-tracker
@@ -260,7 +289,7 @@ copia el `token` de la respuesta y úsalo como `Authorization: Bearer <token>` e
 resto de llamadas (en Swagger, botón "Authorize"). La app Flutter lo gestiona sola
 tras el login.
 
-## 7. Notas de validación
+## 8. Notas de validación
 
 - El código no se ha podido compilar/ejecutar en el entorno de desarrollo actual
   (sin Python funcional ni Docker disponibles). La validación real se hace al

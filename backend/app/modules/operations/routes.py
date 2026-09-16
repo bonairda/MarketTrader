@@ -1,0 +1,130 @@
+"""Endpoints del libro de operaciones y del informe fiscal FIFO."""
+
+from __future__ import annotations
+
+from datetime import date, datetime
+from decimal import Decimal
+
+from fastapi import APIRouter, Depends, Query, Response
+from pydantic import BaseModel, Field, field_validator
+
+from app.modules.auth.deps import CurrentUser, get_current_user
+from app.modules.operations import service
+from app.providers.symbols import normalize_asset_id
+
+router = APIRouter(tags=["operations", "tax"])
+
+
+class OperationIn(BaseModel):
+    assetId: str = Field(min_length=1, max_length=120)
+    side: str
+    tradeDate: date
+    executedAt: datetime | None = None
+    quantity: Decimal = Field(gt=0, max_digits=30, decimal_places=12)
+    unitPriceOriginal: Decimal = Field(gt=0, max_digits=30, decimal_places=12)
+    grossAmountOriginal: Decimal = Field(gt=0, max_digits=30, decimal_places=12)
+    feesOriginal: Decimal = Field(
+        default=Decimal("0"), ge=0, max_digits=30, decimal_places=12
+    )
+    currency: str = Field(min_length=3, max_length=12)
+    fxRateToEur: Decimal = Field(gt=0, max_digits=24, decimal_places=12)
+    fxSource: str | None = Field(default="USER", max_length=80)
+    source: str = Field(default="MANUAL", max_length=80)
+    externalId: str | None = Field(default=None, max_length=250)
+    notes: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("side", "currency", "source", "fxSource")
+    @classmethod
+    def uppercase(cls, value: str | None) -> str | None:
+        return value.strip().upper() if value else value
+
+    def to_service_dict(self) -> dict:
+        return {
+            "asset_id": self.assetId,
+            "side": self.side,
+            "trade_date": self.tradeDate,
+            "executed_at": self.executedAt,
+            "quantity": self.quantity,
+            "unit_price_original": self.unitPriceOriginal,
+            "gross_amount_original": self.grossAmountOriginal,
+            "fees_original": self.feesOriginal,
+            "currency": self.currency,
+            "fx_rate_to_eur": self.fxRateToEur,
+            "fx_source": self.fxSource,
+            "source": self.source,
+            "external_id": self.externalId,
+            "notes": self.notes,
+        }
+
+
+@router.get("/operations")
+async def list_operations(
+    asset_id: str | None = Query(default=None, alias="assetId"),
+    side: str | None = Query(default=None, pattern="^(BUY|SELL)$"),
+    year: int | None = Query(default=None, ge=1900),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    user: CurrentUser = Depends(get_current_user),
+) -> list[dict]:
+    return await service.list_operations(
+        user.id,
+        asset_id=normalize_asset_id(asset_id) if asset_id else None,
+        side=side,
+        year=year,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.post("/operations", status_code=201)
+async def create_operation(
+    body: OperationIn, user: CurrentUser = Depends(get_current_user)
+) -> dict:
+    return await service.create_operation(user.id, body.to_service_dict())
+
+
+@router.get("/operations/audit")
+async def operation_audit_log(
+    limit: int = Query(default=200, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    user: CurrentUser = Depends(get_current_user),
+) -> list[dict]:
+    return await service.list_audit_log(user.id, limit=limit, offset=offset)
+
+
+@router.get("/operations/{operation_id}")
+async def get_operation(
+    operation_id: str, user: CurrentUser = Depends(get_current_user)
+) -> dict:
+    return await service.get_operation(user.id, operation_id)
+
+
+@router.delete("/operations/{operation_id}", status_code=204)
+async def delete_operation(
+    operation_id: str, user: CurrentUser = Depends(get_current_user)
+) -> None:
+    await service.delete_operation(user.id, operation_id)
+
+
+@router.get("/tax/reports/{year}")
+async def tax_report(
+    year: int, user: CurrentUser = Depends(get_current_user)
+) -> dict:
+    return await service.get_tax_report(user.id, year)
+
+
+@router.get("/tax/reports/{year}/csv")
+async def tax_report_csv(
+    year: int, user: CurrentUser = Depends(get_current_user)
+) -> Response:
+    report = await service.get_tax_report(user.id, year)
+    content = service.tax_report_csv(report)
+    return Response(
+        content=content.encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="markettracker-fiscal-{year}.csv"'
+            )
+        },
+    )

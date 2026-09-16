@@ -18,17 +18,34 @@ class LiveStream {
   Timer? _reconnectTimer;
   bool _closed = false;
 
+  String? _token;
+
   Stream<LivePrice> get stream => _controller.stream;
 
-  void connect() {
+  void connect(String? token) {
+    _token = token;
+    _closed = false;
+    _open();
+  }
+
+  /// Reconecta para que el servidor recargue la watchlist tras altas/bajas.
+  void reconnect(String? token) {
+    _token = token;
+    _reconnectTimer?.cancel();
+    _sub?.cancel();
+    _channel?.sink.close();
+    _channel = null;
     _closed = false;
     _open();
   }
 
   void _open() {
-    if (_closed) return;
+    if (_closed || _token == null || _token!.isEmpty) return;
     try {
-      _channel = WebSocketChannel.connect(Uri.parse(AppConfig.liveWsUrl));
+      final uri = Uri.parse(AppConfig.liveWsUrl).replace(
+        queryParameters: {'token': _token!},
+      );
+      _channel = WebSocketChannel.connect(uri);
       _sub = _channel!.stream.listen(
         _onMessage,
         onError: (_) => _scheduleReconnect(),

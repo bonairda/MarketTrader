@@ -50,3 +50,14 @@ def test_summarize_ignores_unpriced_in_value():
     assert summary["totalCost"] == 200
     assert summary["totalValue"] == 110
     assert summary["totalPnl"] == 10
+
+
+def test_summarize_percent_uses_only_priced_cost():
+    positions = [
+        valuation.value_position(1, 100, 110),
+        valuation.value_position(9, 100, None),
+    ]
+    summary = valuation.summarize(positions)
+    assert summary["totalCost"] == 1000
+    assert summary["totalPnl"] == 10
+    assert summary["totalPnlPercent"] == pytest.approx(10.0)

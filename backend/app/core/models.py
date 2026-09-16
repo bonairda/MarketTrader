@@ -6,15 +6,23 @@ migraciones. Solo se persisten velas (PriceBar); los ticks viven en Redis.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
+    Date,
     DateTime,
     Float,
+    ForeignKey,
+    Index,
     Integer,
+    JSON,
+    Numeric,
     String,
     func,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -108,5 +116,98 @@ class Position(Base):
     quantity: Mapped[float] = mapped_column(Float, nullable=False)
     average_price: Mapped[float] = mapped_column(Float, nullable=False)
     opened_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class Operation(Base):
+    """Operación de inversión fiscal, expresada en divisa original y EUR.
+
+    `fx_rate_to_eur` significa EUR recibidos por una unidad de la divisa
+    original (por ejemplo, 1 USD = 0.92 EUR). Los importes monetarios usan
+    Decimal/NUMERIC para evitar errores binarios de redondeo.
+    """
+
+    __tablename__ = "operations"
+    __table_args__ = (
+        CheckConstraint("side IN ('BUY', 'SELL')", name="ck_operations_side"),
+        CheckConstraint("quantity > 0", name="ck_operations_quantity_positive"),
+        CheckConstraint(
+            "unit_price_original > 0", name="ck_operations_unit_price_positive"
+        ),
+        CheckConstraint(
+            "gross_amount_original > 0", name="ck_operations_gross_positive"
+        ),
+        CheckConstraint("fees_original >= 0", name="ck_operations_fees_nonnegative"),
+        CheckConstraint(
+            "fees_original <= gross_amount_original",
+            name="ck_operations_fees_not_above_gross",
+        ),
+        CheckConstraint("fx_rate_to_eur > 0", name="ck_operations_fx_positive"),
+        Index(
+            "ix_operations_user_asset_order",
+            "user_id",
+            "asset_id",
+            "trade_date",
+            "executed_at",
+            "id",
+        ),
+        Index("ix_operations_user_trade_date", "user_id", "trade_date"),
+        Index(
+            "ux_operations_user_source_external_id",
+            "user_id",
+            "source",
+            "external_id",
+            unique=True,
+            postgresql_where=text("external_id IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    asset_id: Mapped[str] = mapped_column(String, nullable=False)
+    side: Mapped[str] = mapped_column(String, nullable=False)
+    trade_date: Mapped[date] = mapped_column(Date, nullable=False)
+    executed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    quantity: Mapped[Decimal] = mapped_column(Numeric(30, 12), nullable=False)
+    unit_price_original: Mapped[Decimal] = mapped_column(
+        Numeric(30, 12), nullable=False
+    )
+    gross_amount_original: Mapped[Decimal] = mapped_column(
+        Numeric(30, 12), nullable=False
+    )
+    fees_original: Mapped[Decimal] = mapped_column(
+        Numeric(30, 12), nullable=False, default=Decimal("0")
+    )
+    currency: Mapped[str] = mapped_column(String(12), nullable=False)
+    fx_rate_to_eur: Mapped[Decimal] = mapped_column(Numeric(24, 12), nullable=False)
+    fx_source: Mapped[str | None] = mapped_column(String, nullable=True)
+    source: Mapped[str] = mapped_column(String, nullable=False, default="MANUAL")
+    external_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    notes: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class OperationAuditLog(Base):
+    """Registro inmutable de altas y bajas del libro fiscal."""
+
+    __tablename__ = "operation_audit_log"
+    __table_args__ = (
+        CheckConstraint("action IN ('CREATE', 'DELETE')", name="ck_operation_audit_action"),
+        Index("ix_operation_audit_user_operation", "user_id", "operation_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    operation_id: Mapped[str] = mapped_column(String, nullable=False)
+    action: Mapped[str] = mapped_column(String, nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

@@ -34,7 +34,10 @@ def summarize(valued_positions: list[dict]) -> dict:
     priced = [p for p in valued_positions if p["marketValue"] is not None]
     total_value = sum(p["marketValue"] for p in priced)
     total_pnl = sum(p["pnl"] for p in priced)
-    total_pnl_percent = (total_pnl / total_cost * 100) if total_cost != 0 else None
+    # El porcentaje usa solo el coste valorado; dividir P&L parcial por el coste
+    # de posiciones sin precio sesgaría el resultado a la baja.
+    priced_cost = sum(p["cost"] for p in priced)
+    total_pnl_percent = (total_pnl / priced_cost * 100) if priced_cost != 0 else None
     return {
         "totalCost": total_cost,
         "totalValue": total_value,

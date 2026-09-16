@@ -35,8 +35,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   void initState() {
     super.initState();
     _load();
-    // Fuente principal: WebSocket. Actualiza los precios en tiempo real.
-    _liveStream.connect();
+    // Fuente principal: WebSocket autenticado y filtrado por usuario.
+    _liveStream.connect(widget.api.authToken);
     _liveSub = _liveStream.stream.listen((price) {
       if (!mounted) return;
       setState(() => _prices[price.symbol] = price);
@@ -95,6 +95,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         SnackBar(content: Text('${symbol.toUpperCase()} añadido a la watchlist')),
       );
       await _load(silent: true);
+      _liveStream.reconnect(widget.api.authToken);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -108,6 +109,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       await widget.api.removeFromWatchlist(symbol);
       if (!mounted) return;
       setState(() => _prices.remove(symbol));
+      _liveStream.reconnect(widget.api.authToken);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${symbol.toUpperCase()} eliminado')),
       );

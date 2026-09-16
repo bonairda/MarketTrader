@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../services/market_api.dart';
 import 'dashboard_screen.dart';
+import 'operations_screen.dart';
 import 'portfolio_screen.dart';
 import 'watchlist_screen.dart';
 
-/// Contenedor principal con navegación inferior entre Dashboard, Watchlist y Cartera.
+/// Navegación principal: mercado, watchlist, cartera y libro de operaciones.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.api, this.onLogout});
 
@@ -42,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       WatchlistScreen(api: widget.api),
       PortfolioScreen(api: widget.api),
+      OperationsScreen(api: widget.api),
     ];
 
     return Scaffold(
@@ -54,6 +56,8 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(icon: Icon(Icons.star), label: 'Watchlist'),
           NavigationDestination(
               icon: Icon(Icons.account_balance_wallet), label: 'Cartera'),
+          NavigationDestination(
+              icon: Icon(Icons.swap_horiz), label: 'Operaciones'),
         ],
       ),
     );

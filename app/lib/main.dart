@@ -61,7 +61,23 @@ class _AuthGateState extends State<_AuthGate> {
   @override
   void initState() {
     super.initState();
+    widget.api.onUnauthorized = _handleUnauthorized;
     _restore();
+  }
+
+  @override
+  void dispose() {
+    widget.api.onUnauthorized = null;
+    super.dispose();
+  }
+
+  void _handleUnauthorized() {
+    widget.auth.logout().ignore();
+    if (!mounted) return;
+    setState(() {
+      _authenticated = false;
+      _checking = false;
+    });
   }
 
   Future<void> _restore() async {

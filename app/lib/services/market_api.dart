@@ -7,9 +7,11 @@ import '../models/backtest.dart';
 import '../models/dashboard.dart';
 import '../models/indicators.dart';
 import '../models/live_price.dart';
+import '../models/operation.dart';
 import '../models/portfolio.dart';
 import '../models/price_bar.dart';
 import '../models/signal.dart';
+import '../models/tax_report.dart';
 
 /// Se lanza cuando la API responde 401 (token ausente, inválido o caducado).
 /// La capa de UI la usa para volver a la pantalla de login.
@@ -30,6 +32,9 @@ class MarketApi {
 
   final http.Client _client;
   String get _base => AppConfig.apiBaseUrl;
+
+  /// Notifica al gate de sesión si cualquier llamada detecta un JWT caducado.
+  void Function()? onUnauthorized;
 
   String? _token;
 
@@ -142,6 +147,69 @@ class MarketApi {
     return BacktestResult.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
 
+  // -------------------------- Operaciones fiscales --------------------------
+
+  Future<List<InvestmentOperation>> getOperations({
+    String? assetId,
+    String? side,
+    int? year,
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final params = <String, String>{
+      'limit': '$limit',
+      'offset': '$offset',
+      if (assetId != null && assetId.isNotEmpty) 'assetId': assetId,
+      if (side != null && side.isNotEmpty) 'side': side,
+      if (year != null) 'year': '$year',
+    };
+    final uri = Uri.parse('$_base/operations').replace(queryParameters: params);
+    final res = await _client.get(uri, headers: _headers());
+    _ensureOk(res);
+    final data = jsonDecode(res.body) as List<dynamic>;
+    return data
+        .map((e) => InvestmentOperation.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<InvestmentOperation> createOperation(NewInvestmentOperation operation) async {
+    final res = await _client.post(
+      Uri.parse('$_base/operations'),
+      headers: _headers(json: true),
+      body: jsonEncode(operation.toJson()),
+    );
+    _ensureOk(res);
+    return InvestmentOperation.fromJson(
+      jsonDecode(res.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<void> deleteOperation(String id) async {
+    final res = await _client.delete(
+      Uri.parse('$_base/operations/$id'),
+      headers: _headers(),
+    );
+    _ensureOk(res);
+  }
+
+  Future<TaxReport> getTaxReport(int year) async {
+    final res = await _client.get(
+      Uri.parse('$_base/tax/reports/$year'),
+      headers: _headers(),
+    );
+    _ensureOk(res);
+    return TaxReport.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  Future<String> getTaxCsv(int year) async {
+    final res = await _client.get(
+      Uri.parse('$_base/tax/reports/$year/csv'),
+      headers: _headers(),
+    );
+    _ensureOk(res);
+    return utf8.decode(res.bodyBytes);
+  }
+
   // -------------------------- Cartera --------------------------
 
   /// GET /portfolio -> posiciones valoradas + resumen P&L.
@@ -248,6 +316,7 @@ class MarketApi {
 
   void _ensureOk(http.Response res) {
     if (res.statusCode == 401) {
+      onUnauthorized?.call();
       throw const UnauthorizedException();
     }
     if (res.statusCode < 200 || res.statusCode >= 300) {
