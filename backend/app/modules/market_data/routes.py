@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 from app.core.logging import get_logger
-from app.modules.market_data import bars, live
+from app.modules.market_data import bars, indicators_service, live
 from app.modules.market_data.broadcaster import broadcaster
 from app.modules.watchlists import repository as watchlist_repo
 
@@ -31,6 +31,16 @@ async def get_bars(
     limit: int = Query(default=200, le=1000),
 ) -> list[dict]:
     return await bars.get_bars(symbol.lower(), interval, limit)
+
+
+@router.get("/indicators/{symbol}")
+async def get_indicators(
+    symbol: str,
+    interval: str = Query(default="1m"),
+    limit: int = Query(default=500, le=1000),
+) -> dict:
+    """Indicadores técnicos calculados bajo demanda sobre las velas del activo."""
+    return await indicators_service.compute_indicators(symbol.lower(), interval, limit)
 
 
 @router.websocket("/ws")

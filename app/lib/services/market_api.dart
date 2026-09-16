@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../core/config.dart';
+import '../models/indicators.dart';
 import '../models/live_price.dart';
 import '../models/price_bar.dart';
 
@@ -38,6 +39,20 @@ class MarketApi {
     return data
         .map((e) => PriceBar.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  /// GET /market/indicators/{symbol} -> indicadores técnicos.
+  Future<Indicators> getIndicators(
+    String symbol, {
+    String interval = '1m',
+    int limit = 500,
+  }) async {
+    final uri = Uri.parse(
+      '$_base/market/indicators/$symbol?interval=$interval&limit=$limit',
+    );
+    final res = await _client.get(uri);
+    _ensureOk(res);
+    return Indicators.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
 
   /// GET /watchlist -> símbolos seguidos.

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/indicators.dart';
 import '../models/price_bar.dart';
 import '../services/market_api.dart';
 import '../widgets/candlestick_chart.dart';
@@ -20,6 +21,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
 
   String _interval = '1m';
   List<PriceBar> _bars = [];
+  Indicators? _indicators;
   bool _loading = true;
   String? _error;
 
@@ -47,6 +49,16 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
         _error = e.toString();
         _loading = false;
       });
+    }
+    // Los indicadores son secundarios: si fallan, no rompen el gráfico.
+    try {
+      final indicators =
+          await widget.api.getIndicators(widget.symbol, interval: _interval);
+      if (!mounted) return;
+      setState(() => _indicators = indicators);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _indicators = null);
     }
   }
 
@@ -133,9 +145,80 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
     if (_bars.isEmpty) {
       return const Center(child: Text('Sin datos todavía'));
     }
-    return Padding(
+    return ListView(
       padding: const EdgeInsets.all(12),
-      child: CandlestickChart(bars: _bars),
+      children: [
+        SizedBox(height: 280, child: CandlestickChart(bars: _bars)),
+        const SizedBox(height: 16),
+        if (_indicators != null) _IndicatorsPanel(indicators: _indicators!),
+      ],
+    );
+  }
+}
+
+/// Panel con el valor actual de los principales indicadores.
+class _IndicatorsPanel extends StatelessWidget {
+  const _IndicatorsPanel({required this.indicators});
+
+  final Indicators indicators;
+
+  String _fmt(double? v) => v == null ? '—' : v.toStringAsFixed(2);
+
+  @override
+  Widget build(BuildContext context) {
+    final rsi = indicators.latest('rsi14');
+    final rows = <(String, String)>[
+      ('RSI (14)', _fmt(rsi)),
+      ('SMA 20', _fmt(indicators.latest('sma20'))),
+      ('SMA 50', _fmt(indicators.latest('sma50'))),
+      ('EMA 20', _fmt(indicators.latest('ema20'))),
+      ('MACD', _fmt(indicators.latest('macd'))),
+      ('Señal MACD', _fmt(indicators.latest('macdSignal'))),
+      ('ATR (14)', _fmt(indicators.latest('atr14'))),
+      ('Bollinger sup.', _fmt(indicators.latest('bollingerUpper'))),
+      ('Bollinger inf.', _fmt(indicators.latest('bollingerLower'))),
+    ];
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Indicadores', style: Theme.of(context).textTheme.titleMedium),
+            if (rsi != null) _rsiHint(rsi),
+            const SizedBox(height: 8),
+            ...rows.map(
+              (r) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(r.$1),
+                    Text(r.$2, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Pista textual del RSI (no solo color, por accesibilidad).
+  Widget _rsiHint(double rsi) {
+    String label;
+    if (rsi >= 70) {
+      label = 'Sobrecompra';
+    } else if (rsi <= 30) {
+      label = 'Sobreventa';
+    } else {
+      label = 'Neutral';
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Text('Estado RSI: $label', style: const TextStyle(fontSize: 12)),
     );
   }
 }

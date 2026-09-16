@@ -67,6 +67,7 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 - `GET /market/prices` — precios en vivo de la watchlist
 - `GET /market/prices/{symbol}`
 - `GET /market/bars/{symbol}?interval=1m&limit=200`
+- `GET /market/indicators/{symbol}?interval=1m&limit=500` — indicadores técnicos (F2)
 - `WS  /market/ws` — stream de precios en vivo (Redis pub/sub -> WebSocket)
 - `GET /watchlist` · `POST /watchlist` · `DELETE /watchlist/{asset_id}`
 - `GET /alerts` · `POST /alerts` · `PUT /alerts/{id}/enabled` · `DELETE /alerts/{id}`
@@ -94,9 +95,12 @@ Pendiente futuro (no bloquea F1):
 - [ ] **FCM (push móvil)**: completar `FcmNotifier` (requiere proyecto Firebase + credenciales y
       registro de tokens de dispositivo). La abstracción ya está lista; solo falta la implementación.
 
-### F2
+### F2 (en curso)
+- [x] **Indicadores técnicos** (SMA/EMA, RSI, MACD, ATR, Bollinger, retornos) en Python puro
+      (`market_data/indicators.py`), calculados bajo demanda vía `GET /market/indicators/{symbol}`
+      (`indicators_service.py`). Con tests de valores conocidos y casos borde.
+      La app los muestra en el detalle del activo (panel con RSI y su estado, medias, MACD, ATR, Bollinger).
 - [ ] Adaptador de acciones/forex (Twelve Data o Polygon), aceptando retraso ~15 min.
-- [ ] Indicadores técnicos (SMA/EMA, RSI, MACD, ATR, Bollinger) sobre velas.
 - [ ] Dashboard de inicio (estado global, top movers, mapa de calor).
 - [ ] Más tipos de alerta (%, volatilidad, volumen, cruce de indicador).
 
