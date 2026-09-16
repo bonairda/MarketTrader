@@ -74,9 +74,7 @@ async def create_rule(
 
 async def delete_rule(rule_id: str) -> None:
     async with SessionLocal() as session:
-        await session.execute(
-            text("DELETE FROM alert_rules WHERE id = :id"), {"id": rule_id}
-        )
+        await session.execute(text("DELETE FROM alert_rules WHERE id = :id"), {"id": rule_id})
         await session.commit()
 
 

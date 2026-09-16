@@ -50,3 +50,17 @@ market-tracker/
 - **Suscripción selectiva:** el worker solo escucha los activos de la watchlist.
 - **Cripto en vivo** (Binance WS, gratis) para el MVP; acciones/forex se añaden después.
 - Tareas async con ARQ / BackgroundTasks (no Celery).
+
+## Calidad de código (backend)
+
+Lint, formato y tests del backend:
+
+```bash
+cd backend
+ruff check .          # lint (bloqueante en CI)
+black .               # aplica formato (recomendado antes de commitear)
+pytest -q             # tests
+```
+
+Nota: en CI, `black --check` es informativo (no bloquea). Aplica el formato en
+local con `black .` y commitea el resultado para mantener el estilo consistente.
