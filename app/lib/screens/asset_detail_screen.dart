@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/indicators.dart';
 import '../models/price_bar.dart';
+import '../models/signal.dart';
 import '../services/market_api.dart';
 import '../widgets/candlestick_chart.dart';
 
@@ -22,6 +23,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
   String _interval = '1m';
   List<PriceBar> _bars = [];
   Indicators? _indicators;
+  TradingSignal? _signal;
   bool _loading = true;
   String? _error;
 
@@ -59,6 +61,15 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _indicators = null);
+    }
+    // La señal también es secundaria.
+    try {
+      final signal = await widget.api.getSignal(widget.symbol, interval: _interval);
+      if (!mounted) return;
+      setState(() => _signal = signal);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _signal = null);
     }
   }
 
@@ -150,10 +161,113 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
+        if (_signal != null) _SignalPanel(signal: _signal!),
+        if (_signal != null) const SizedBox(height: 12),
         SizedBox(height: 280, child: CandlestickChart(bars: _bars)),
         const SizedBox(height: 16),
         if (_indicators != null) _IndicatorsPanel(indicators: _indicators!),
       ],
+    );
+  }
+}
+
+/// Panel destacado con la señal (acción, score, confianza, riesgo, motivos).
+class _SignalPanel extends StatelessWidget {
+  const _SignalPanel({required this.signal});
+
+  final TradingSignal signal;
+
+  Color _actionColor() {
+    switch (signal.action) {
+      case 'BUY':
+        return Colors.green.shade700;
+      case 'SELL':
+        return Colors.red.shade700;
+      case 'WATCH':
+        return Colors.orange.shade800;
+      default:
+        return Colors.blueGrey;
+    }
+  }
+
+  String _actionLabel() {
+    switch (signal.action) {
+      case 'BUY':
+        return 'COMPRAR';
+      case 'SELL':
+        return 'VENDER';
+      case 'WATCH':
+        return 'VIGILAR';
+      default:
+        return 'MANTENER';
+    }
+  }
+
+  String _riskLabel() {
+    switch (signal.riskLevel) {
+      case 'HIGH':
+        return 'Riesgo alto';
+      case 'MEDIUM':
+        return 'Riesgo medio';
+      default:
+        return 'Riesgo bajo';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _actionColor();
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _actionLabel(),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const Spacer(),
+                Text('Fuerza ${signal.score} · Confianza ${signal.confidence}',
+                    style: const TextStyle(fontSize: 12)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Riesgo con texto (no solo color, por accesibilidad).
+            Text('${_riskLabel()} (${signal.riskScore}/100)',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            ...signal.rationale.map(
+              (r) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('• '),
+                    Expanded(child: Text(r, style: const TextStyle(fontSize: 13))),
+                  ],
+                ),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Señal cuantitativa orientativa; no es asesoramiento financiero.',
+                style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

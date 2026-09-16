@@ -22,7 +22,7 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 | F0 | Cimientos (repos, Docker, esqueleto backend) + consolidación (bloques A/B/C) | Completa |
 | F1 | MVP: cripto en vivo + watchlist + velas + alertas + app | Completa |
 | F2 | Acciones/forex, indicadores, dashboard, tipos de alerta | Completa |
-| F3 | Señales, riesgo, mercados llamativos | Pendiente (siguiente) |
+| F3 | Señales, riesgo, mercados llamativos | Completa |
 | F4 | Backtesting, cartera/simulación | Pendiente |
 | F5 | Multiusuario, roles, producto comercial | Pendiente |
 
@@ -69,6 +69,7 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 - `GET /market/bars/{symbol}?interval=1m&limit=200`
 - `GET /market/indicators/{symbol}?interval=1m&limit=500` — indicadores técnicos (F2)
 - `GET /dashboard?fresh=false` — resumen del mercado seguido (F2)
+- `GET /signals/{symbol}?interval=1m` — señal + riesgo del activo (F3)
 - `WS  /market/ws` — stream de precios en vivo (Redis pub/sub -> WebSocket)
 - `GET /watchlist` · `POST /watchlist` · `DELETE /watchlist/{asset_id}`
 - `GET /alerts` · `POST /alerts` · `PUT /alerts/{id}/enabled` · `DELETE /alerts/{id}`
@@ -115,10 +116,15 @@ Pendiente futuro (no bloquea F1):
       p. ej. RSI14 por encima de 70). Los de precio se evalúan por tick; los de velas/indicador
       periódicamente en el worker. La app permite elegir el tipo en el diálogo de alerta.
 
-### F3
-- [ ] Motor de señales por reglas (BUY/SELL/HOLD/WATCH) con explicación (`rationale`).
-- [ ] Puntuación de riesgo.
-- [ ] Detección de "mercados llamativos" + push.
+### F3 — COMPLETA
+- [x] **Motor de señales por reglas** (BUY/SELL/HOLD/WATCH) con score, confianza y `rationale`
+      explicable (RSI + tendencia SMA20/50 + MACD). `GET /signals/{symbol}`. Puro y testeado.
+- [x] **Puntuación de riesgo** (volatilidad + drawdown -> 0-100, nivel LOW/MEDIUM/HIGH),
+      adjunta a cada señal. La app muestra un panel destacado con acción, fuerza, confianza,
+      riesgo y motivos, con aviso de que no es asesoramiento financiero.
+- [x] **Detección de "mercados llamativos"**: movimiento atípico, volumen inusual y rupturas,
+      evaluados periódicamente en el worker y notificados por los canales configurados
+      (con cooldown por símbolo+motivo).
 
 ### F4 / F5
 - [ ] Backtesting y evaluación de señales.

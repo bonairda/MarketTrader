@@ -7,6 +7,7 @@ import '../models/dashboard.dart';
 import '../models/indicators.dart';
 import '../models/live_price.dart';
 import '../models/price_bar.dart';
+import '../models/signal.dart';
 
 /// Cliente HTTP de la API de MarketTracker.
 class MarketApi {
@@ -54,6 +55,14 @@ class MarketApi {
     final res = await _client.get(uri);
     _ensureOk(res);
     return Indicators.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  /// GET /signals/{symbol} -> señal + riesgo del activo.
+  Future<TradingSignal> getSignal(String symbol, {String interval = '1m'}) async {
+    final uri = Uri.parse('$_base/signals/$symbol?interval=$interval');
+    final res = await _client.get(uri);
+    _ensureOk(res);
+    return TradingSignal.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
 
   /// GET /dashboard -> resumen del mercado seguido.

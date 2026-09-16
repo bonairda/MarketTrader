@@ -25,6 +25,7 @@ from app.modules.alerts.engine import AlertEngine
 from app.modules.market_data import live
 from app.modules.market_data.aggregator import BarAggregator
 from app.modules.notifications import dispatcher
+from app.modules.signals import hotmarkets_service
 from app.modules.watchlists import repository as watchlist_repo
 from app.modules.watchlists.events import WATCHLIST_CHANGED_CHANNEL
 from app.providers import symbols as symbol_utils
@@ -40,6 +41,8 @@ log = get_logger("worker")
 _RULES_REFRESH_SECONDS = 30
 # Cada cuántos segundos se comprueban velas vencidas y el estado de ingestión.
 _MAINTENANCE_INTERVAL_SECONDS = 5
+# Cada cuántos segundos se evalúan los mercados llamativos (más espaciado).
+_HOTMARKET_INTERVAL_SECONDS = 30
 
 
 class IngestionMonitor:
@@ -107,15 +110,20 @@ async def _maintenance(
     """Cierra velas vencidas, evalúa alertas por velas/indicadores, recarga
     reglas y vigila la ingestión (watchdog)."""
     seconds_since_rules = 0
+    seconds_since_hotmarkets = 0
     while True:
         await asyncio.sleep(_MAINTENANCE_INTERVAL_SECONDS)
         await aggregator.flush_stale()
         await alert_engine.evaluate_candle_based()
         await monitor.check()
         seconds_since_rules += _MAINTENANCE_INTERVAL_SECONDS
+        seconds_since_hotmarkets += _MAINTENANCE_INTERVAL_SECONDS
         if seconds_since_rules >= _RULES_REFRESH_SECONDS:
             await alert_engine.refresh_rules()
             seconds_since_rules = 0
+        if seconds_since_hotmarkets >= _HOTMARKET_INTERVAL_SECONDS:
+            await hotmarkets_service.evaluate_watchlist()
+            seconds_since_hotmarkets = 0
 
 
 async def _watch_watchlist(changed: asyncio.Event) -> None:
