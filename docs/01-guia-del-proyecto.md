@@ -207,7 +207,8 @@ login y registro, requieren un JWT `Bearer`.
 | **corporate** | `/corporate-events` | Dividendos (con retención) y splits. | `GET`, `POST` (201), `DELETE /{event_id}` (204) |
 | **fx** | `/fx` | Tipos de cambio a EUR (feeds del BCE). | `GET /rate` |
 | **paper_trading** | `/paper-trading` | Operativa simulada con Alpaca (opt-in). | `GET /status`, `GET /account`, `GET /positions`, `GET /orders`, `POST /orders` |
-| **notifications** | — | Envío a canales configurados (Telegram/FCM). | `dispatcher.notify(...)` (uso interno) |
+| **notifications** | `/notifications` | Telegram por usuario (vincular chat) + envío. | `GET /telegram`, `POST /telegram/link`, `POST /telegram/enabled`, `DELETE /telegram`, `POST /telegram/webhook` |
+| **admin** | `/admin` | Gestión de usuarios (solo SUPERADMIN). | `GET /users`, `POST /users` (201), `PUT /users/{id}/role`, `PUT /users/{id}/active`, `DELETE /users/{id}` (204) |
 
 ### Detalles de la lógica por módulo
 
@@ -230,6 +231,14 @@ login y registro, requieren un JWT `Bearer`.
   histórico de 90 días), con caché en Redis (12 h) y *fallback* al último día hábil.
 - **dashboard** (`service.py`): agrega el estado de la watchlist (contadores,
   *top movers*, más volátiles), cacheado en Redis.
+- **notifications** (`dispatcher.py`, `telegram.py`, `repository.py`): envío por
+  canales. `notify(text, user_id=None)` dirige la alerta al chat de Telegram
+  **del usuario** dueño de la regla (bot único del sistema, `chat_id` por usuario
+  en `user_telegram_links`); sin `user_id`, usa el chat global (watchdog). La
+  vinculación se hace con un código de un solo uso (Redis) y `/start <código>`.
+- **admin** (`service.py`): gestión de usuarios restringida a `SUPERADMIN` (crear,
+  cambiar rol, activar/desactivar, borrar), con salvaguardas para no auto-
+  degradarse/desactivarse/borrarse.
 
 ## 6. El worker de ingestión
 
@@ -321,6 +330,7 @@ Las migraciones viven en `backend/alembic/versions/` y forman la cadena
 | `0004_users_and_ownership` | Tabla `users` y `user_id` en watchlist_items (PK compuesta), alert_rules y positions, con índices por usuario. |
 | `0005_operations` | `operations` (libro fiscal, índice único parcial por `external_id`) y `operation_audit_log`. |
 | `0006_corporate_events` | `corporate_events` (dividendos con retención y splits). |
+| `0007_user_telegram_links` | `user_telegram_links` (chat de Telegram por usuario para alertas personales). |
 
 La tabla `price_bars` es una **hypertable de TimescaleDB**, optimizada para series
 temporales; solo contiene velas **cerradas**.

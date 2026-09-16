@@ -229,17 +229,54 @@ real**.
 > El paper trading siempre opera contra el entorno de práctica de Alpaca. Nunca se
 > ejecutan órdenes con dinero real.
 
-## 12. Notificaciones
+## 12. Notificaciones (Telegram)
 
-Si el administrador ha configurado un bot de **Telegram**, recibirás por ahí:
+Puedes vincular **tu propio chat de Telegram** para recibir **solo tus** alertas.
+Cada usuario tiene su propio chat; no compartes notificaciones con nadie.
 
-- Los avisos de tus **alertas** cuando se cumplen.
-- Los avisos del **watchdog** si la ingestión de precios se detiene.
+**Vincular tu chat:**
 
-Si no hay Telegram configurado, las alertas se evalúan igual y quedan registradas
-en el servidor, pero no se envían mensajes.
+1. Entra en **Operaciones → menú (⋮) → Notificaciones**.
+2. Pulsa **Generar código**.
+3. Abre el **bot de Telegram** del proyecto y envía el comando `/start` con tu
+   código (puedes copiarlo con "Copiar comando").
+4. El bot te confirmará con un ✅ y volverás a la app; tu chat quedará vinculado.
 
-## 13. Preguntas frecuentes
+Desde esa pantalla puedes **pausar** el envío sin desvincular (interruptor) o
+**desvincular** el chat cuando quieras.
+
+Qué recibirás en tu chat:
+
+- Los avisos de **tus alertas** de precio e indicadores cuando se cumplen.
+
+Notas:
+
+- Si el administrador no ha configurado el bot, la vinculación no estará
+  disponible y la pantalla lo indicará.
+- Los avisos de **estado del sistema** (watchdog) van a un canal del
+  administrador, no a tu chat personal.
+- Si no vinculas Telegram, tus alertas se siguen evaluando y quedan registradas
+  en el servidor, pero no recibirás mensajes.
+
+## 13. Administración (solo superadministrador)
+
+Si tu cuenta tiene el rol **SUPERADMIN**, verás un icono de **administración**
+(engranaje con escudo) en la parte superior de la pantalla Mercado. Desde ese
+panel puedes:
+
+- **Ver** todos los usuarios, con su rol y si están activos.
+- **Crear** un usuario nuevo (email, contraseña y rol).
+- **Cambiar el rol** de un usuario: `SUPERADMIN`, `OWNER` o `VIEWER`.
+- **Activar o desactivar** una cuenta (un usuario inactivo no puede entrar).
+- **Borrar** un usuario.
+
+Por seguridad, no puedes quitarte a ti mismo el rol de superadmin, ni
+desactivarte ni borrarte a ti mismo (para no dejar el sistema sin administrador).
+
+El superadministrador inicial se define en la configuración del servidor
+(`SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD`) y se crea automáticamente al arrancar.
+
+## 14. Preguntas frecuentes
 
 **No veo precios de una acción que he añadido.**
 Las acciones y el forex requieren que el administrador haya configurado la clave

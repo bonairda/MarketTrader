@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/operation.dart';
 import '../services/market_api.dart';
 import 'corporate_events_screen.dart';
+import 'notifications_screen.dart';
 import 'paper_trading_screen.dart';
 import 'tax_report_screen.dart';
 
@@ -248,11 +249,16 @@ class _OperationsScreenState extends State<OperationsScreen> {
                 Navigator.of(context).push(MaterialPageRoute(
                   builder: (_) => PaperTradingScreen(api: widget.api),
                 ));
+              } else if (value == 'notifications') {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => NotificationsScreen(api: widget.api),
+                ));
               }
             },
             itemBuilder: (_) => const [
               PopupMenuItem(value: 'corporate', child: Text('Eventos corporativos')),
               PopupMenuItem(value: 'paper', child: Text('Paper trading')),
+              PopupMenuItem(value: 'notifications', child: Text('Notificaciones')),
             ],
           ),
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),

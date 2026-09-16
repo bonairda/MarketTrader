@@ -107,13 +107,38 @@ Se usan para autorrellenar el cambio a EUR de las operaciones. No requieren clav
 
 | Variable | Por defecto | Descripción |
 |----------|-------------|-------------|
-| `TELEGRAM_BOT_TOKEN` | (vacío) | Token del bot creado con [@BotFather](https://t.me/BotFather). |
-| `TELEGRAM_CHAT_ID` | (vacío) | ID del chat o grupo destino. |
+| `TELEGRAM_BOT_TOKEN` | (vacío) | Token del **bot único del sistema** (creado con [@BotFather](https://t.me/BotFather)). Con él, cada usuario puede vincular su propio chat y recibir **solo sus** alertas. |
+| `TELEGRAM_CHAT_ID` | (vacío) | Chat **global** para avisos operativos (watchdog/admin). |
+| `TELEGRAM_WEBHOOK_SECRET` | (vacío) | Secreto opcional del webhook. Si se define, el endpoint `/notifications/telegram/webhook` exige el header `X-Telegram-Bot-Api-Secret-Token` con este valor (recomendado en producción). |
 
-Si ambos se dejan vacíos, las alertas y avisos del watchdog **solo se registran en
-el log** y no se envían.
+Con `TELEGRAM_BOT_TOKEN` configurado, cada usuario vincula su chat desde la app
+(ajustes de Notificaciones) enviando `/start <código>` al bot. Sus alertas de
+precio/indicadores le llegan **solo a él**. El `TELEGRAM_CHAT_ID` sigue siendo el
+destino de los avisos del **watchdog** (infraestructura), no de las alertas
+personales. Si no hay bot configurado, todo queda **solo en el log**.
 
-### 2.9 Paper trading (Alpaca) — opcional
+**Registrar el webhook del bot** (una vez, para recibir los `/start`):
+
+```bash
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://api.tu-dominio.com/notifications/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>"
+```
+
+### 2.9 Superadministrador (bootstrap) — opcional
+
+| Variable | Por defecto | Descripción |
+|----------|-------------|-------------|
+| `SUPERADMIN_EMAIL` | (vacío) | Email del superadministrador. |
+| `SUPERADMIN_PASSWORD` | (vacío) | Contraseña. En producción **debe tener ≥ 12 caracteres**. |
+
+Si defines **ambas**, al arrancar la API se **crea o actualiza** ese usuario con
+rol `SUPERADMIN` (operación idempotente): si no existe lo crea; si existe, le
+garantiza el rol, lo deja activo y actualiza la contraseña. El superadmin puede
+crear usuarios y asignarles roles desde el **panel de administración** de la app.
+
+> Marca `SUPERADMIN_PASSWORD` como secreto (no lo subas al repositorio) y rótala
+> si sospechas exposición. Los roles válidos son `SUPERADMIN`, `OWNER` y `VIEWER`.
+
+### 2.10 Paper trading (Alpaca) — opcional
 
 | Variable | Por defecto | Descripción |
 |----------|-------------|-------------|
@@ -188,6 +213,8 @@ El backend ejecuta `assert_safe_for_production()` al arrancar. Con
 - `CORS_ORIGINS` **no vacío**, sin `*` y con **todos los orígenes en HTTPS**.
 - `POSTGRES_PASSWORD` y `REDIS_PASSWORD` **fuertes** (no vacíos, ni `market`, ni el
   placeholder por defecto, ni empezando por `REPLACE_`).
+- Si defines el superadmin, `SUPERADMIN_PASSWORD` debe tener **≥ 12 caracteres** y
+  no empezar por `REPLACE_`.
 
 Buenas prácticas adicionales:
 

@@ -43,14 +43,31 @@ class Settings(BaseSettings):
     # En uso personal se puede dejar abierto; para cerrar el alta, ponlo a False.
     allow_registration: bool = True
 
+    # Superadministrador (bootstrap). Si se definen ambos, al arrancar la API se
+    # crea/actualiza este usuario con rol SUPERADMIN (idempotente). Puede crear
+    # usuarios y asignarles roles desde el panel de administración.
+    # Deja SUPERADMIN_PASSWORD vacío para no gestionar el superadmin por entorno.
+    superadmin_email: str = ""
+    superadmin_password: str = ""
+
+    @property
+    def superadmin_enabled(self) -> bool:
+        return bool(self.superadmin_email.strip() and self.superadmin_password)
+
     # Ingestión
     crypto_ws_url: str = "wss://stream.binance.com:9443/ws"
     default_crypto_symbols: str = "btcusdt,ethusdt"
 
     # Notificaciones (Telegram). Si no se configuran, las alertas se registran
     # en el log pero no se envían.
+    # - telegram_bot_token: bot ÚNICO del sistema. Con él, cada usuario puede
+    #   vincular su propio chat para recibir SUS alertas (ver módulo notifications).
+    # - telegram_chat_id: chat GLOBAL para avisos operativos (watchdog/admin).
+    # - telegram_webhook_secret: si se define, el endpoint del webhook exige el
+    #   header X-Telegram-Bot-Api-Secret-Token con este valor (recomendado).
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
+    telegram_webhook_secret: str = ""
 
     # Watchdog de ingestión: si no llega ningún tick en este tiempo (segundos),
     # el worker avisa por Telegram de que la ingestión puede estar caída.
@@ -133,6 +150,13 @@ class Settings(BaseSettings):
             raise RuntimeError("POSTGRES_PASSWORD no es seguro para producción")
         if self.redis_password in weak or self.redis_password.startswith("REPLACE_"):
             raise RuntimeError("REDIS_PASSWORD no es seguro para producción")
+        if self.superadmin_enabled and (
+            len(self.superadmin_password) < 12
+            or self.superadmin_password.startswith("REPLACE_")
+        ):
+            raise RuntimeError(
+                "SUPERADMIN_PASSWORD debe tener al menos 12 caracteres en producción"
+            )
 
 
 settings = Settings()

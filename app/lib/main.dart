@@ -110,6 +110,10 @@ class _AuthGateState extends State<_AuthGate> {
     if (!_authenticated) {
       return LoginScreen(auth: widget.auth, onAuthenticated: _onAuthenticated);
     }
-    return HomeScreen(api: widget.api, onLogout: _onLogout);
+    return HomeScreen(
+      api: widget.api,
+      onLogout: _onLogout,
+      isSuperadmin: widget.auth.isSuperadmin,
+    );
   }
 }

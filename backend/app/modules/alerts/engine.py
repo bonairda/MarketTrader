@@ -171,5 +171,7 @@ class AlertEngine:
 
     async def _fire(self, rule: dict, message: str) -> None:
         log.info("[ALERT] Disparada regla %s: %s", rule["id"], message)
-        await dispatcher.notify(message)
+        # La alerta es personal: se dirige al chat de Telegram del usuario dueño
+        # de la regla (si lo tiene vinculado y habilitado); si no, queda en el log.
+        await dispatcher.notify(message, user_id=rule["userId"])
         await alerts_repo.mark_triggered(rule["id"])

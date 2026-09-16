@@ -261,3 +261,28 @@ class CorporateEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class UserTelegramLink(Base):
+    """Chat de Telegram vinculado a un usuario para recibir SUS alertas.
+
+    El bot es único del sistema (TELEGRAM_BOT_TOKEN); aquí solo se guarda el
+    `chat_id` destino de cada usuario. El watchdog operativo sigue usando el
+    chat global (TELEGRAM_CHAT_ID), no esta tabla.
+    """
+
+    __tablename__ = "user_telegram_links"
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    chat_id: Mapped[str] = mapped_column(String, nullable=False)
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("TRUE")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

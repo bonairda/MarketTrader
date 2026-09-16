@@ -12,9 +12,16 @@ class AuthService {
 
   static const _tokenKey = 'auth_token';
   static const _emailKey = 'auth_email';
+  static const _roleKey = 'auth_role';
 
   String? _email;
   String? get email => _email;
+
+  String? _role;
+  String? get role => _role;
+
+  /// True si el usuario en sesión es superadministrador.
+  bool get isSuperadmin => _role == 'SUPERADMIN';
 
   /// Carga el token guardado (si lo hay) y lo aplica a la API.
   /// Devuelve true si había una sesión almacenada.
@@ -22,6 +29,7 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString(_tokenKey);
     _email = prefs.getString(_emailKey);
+    _role = prefs.getString(_roleKey);
     if (token == null || token.isEmpty) return false;
     _api.authToken = token;
     return true;
@@ -34,6 +42,9 @@ class AuthService {
     try {
       final user = await _api.me();
       _email = user['email'] as String?;
+      _role = user['role'] as String?;
+      final prefs = await SharedPreferences.getInstance();
+      if (_role != null) await prefs.setString(_roleKey, _role!);
       return true;
     } on UnauthorizedException {
       await logout();
@@ -54,18 +65,22 @@ class AuthService {
   Future<void> logout() async {
     _api.authToken = null;
     _email = null;
+    _role = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_emailKey);
+    await prefs.remove(_roleKey);
   }
 
   Future<void> _persist(Map<String, dynamic> authResult) async {
     final token = authResult['token'] as String;
     final user = authResult['user'] as Map<String, dynamic>?;
     _email = user?['email'] as String?;
+    _role = user?['role'] as String?;
     _api.authToken = token;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token);
     if (_email != null) await prefs.setString(_emailKey, _email!);
+    if (_role != null) await prefs.setString(_roleKey, _role!);
   }
 }

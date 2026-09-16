@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api import api_router
+from app.core.bootstrap import ensure_superadmin
 from app.core.config import settings
 from app.core.errors import register_error_handlers
 from app.core.health import health_report
@@ -23,6 +24,7 @@ settings.assert_safe_for_production()
 async def lifespan(app: FastAPI):
     # El esquema se aplica con Alembic al arrancar el contenedor (ver docker-compose).
     log.info("[INFO] API iniciando")
+    await ensure_superadmin()
     await broadcaster.start()
     yield
     await broadcaster.stop()

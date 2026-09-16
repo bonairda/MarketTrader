@@ -450,6 +450,108 @@ class MarketApi {
     _ensureOk(res);
   }
 
+  // -------------------------- Administración (SUPERADMIN) --------------------------
+
+  /// GET /admin/users -> lista de usuarios (solo superadmin).
+  Future<List<Map<String, dynamic>>> adminListUsers() async {
+    final res = await _client.get(
+      Uri.parse('$_base/admin/users'),
+      headers: _headers(),
+    );
+    _ensureOk(res);
+    final data = jsonDecode(res.body) as List<dynamic>;
+    return data.map((e) => e as Map<String, dynamic>).toList();
+  }
+
+  /// POST /admin/users -> crea un usuario con rol.
+  Future<Map<String, dynamic>> adminCreateUser({
+    required String email,
+    required String password,
+    required String role,
+  }) async {
+    final res = await _client.post(
+      Uri.parse('$_base/admin/users'),
+      headers: _headers(json: true),
+      body: jsonEncode({'email': email, 'password': password, 'role': role}),
+    );
+    _ensureOk(res);
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  /// PUT /admin/users/{id}/role -> cambia el rol de un usuario.
+  Future<Map<String, dynamic>> adminSetRole(String userId, String role) async {
+    final res = await _client.put(
+      Uri.parse('$_base/admin/users/$userId/role'),
+      headers: _headers(json: true),
+      body: jsonEncode({'role': role}),
+    );
+    _ensureOk(res);
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  /// PUT /admin/users/{id}/active -> activa o desactiva un usuario.
+  Future<Map<String, dynamic>> adminSetActive(String userId, bool isActive) async {
+    final res = await _client.put(
+      Uri.parse('$_base/admin/users/$userId/active'),
+      headers: _headers(json: true),
+      body: jsonEncode({'isActive': isActive}),
+    );
+    _ensureOk(res);
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  /// DELETE /admin/users/{id} -> borra un usuario.
+  Future<void> adminDeleteUser(String userId) async {
+    final res = await _client.delete(
+      Uri.parse('$_base/admin/users/$userId'),
+      headers: _headers(),
+    );
+    _ensureOk(res);
+  }
+
+  // -------------------------- Notificaciones (Telegram) --------------------------
+
+  /// GET /notifications/telegram -> estado de la vinculación del usuario.
+  /// Devuelve { botConfigured, linked, enabled }.
+  Future<Map<String, dynamic>> getTelegramStatus() async {
+    final res = await _client.get(
+      Uri.parse('$_base/notifications/telegram'),
+      headers: _headers(),
+    );
+    _ensureOk(res);
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  /// POST /notifications/telegram/link -> genera un código de vinculación.
+  /// Devuelve { botConfigured, code?, expiresInSeconds?, instructions? }.
+  Future<Map<String, dynamic>> createTelegramLinkCode() async {
+    final res = await _client.post(
+      Uri.parse('$_base/notifications/telegram/link'),
+      headers: _headers(),
+    );
+    _ensureOk(res);
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  /// POST /notifications/telegram/enabled -> activa o pausa el envío.
+  Future<void> setTelegramEnabled(bool enabled) async {
+    final res = await _client.post(
+      Uri.parse('$_base/notifications/telegram/enabled'),
+      headers: _headers(json: true),
+      body: jsonEncode({'enabled': enabled}),
+    );
+    _ensureOk(res);
+  }
+
+  /// DELETE /notifications/telegram -> desvincula el chat.
+  Future<void> unlinkTelegram() async {
+    final res = await _client.delete(
+      Uri.parse('$_base/notifications/telegram'),
+      headers: _headers(),
+    );
+    _ensureOk(res);
+  }
+
   void _ensureOk(http.Response res) {
     if (res.statusCode == 401) {
       onUnauthorized?.call();
