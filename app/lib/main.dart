@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'services/market_api.dart';
-import 'screens/watchlist_screen.dart';
+import 'screens/home_screen.dart';
 
 void main() {
   runApp(const MarketTrackerApp());
@@ -32,7 +32,7 @@ class _MarketTrackerAppState extends State<MarketTrackerApp> {
         colorSchemeSeed: const Color(0xFF1E88E5),
         useMaterial3: true,
       ),
-      home: WatchlistScreen(api: _api),
+      home: HomeScreen(api: _api),
     );
   }
 }

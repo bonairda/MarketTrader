@@ -68,6 +68,7 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 - `GET /market/prices/{symbol}`
 - `GET /market/bars/{symbol}?interval=1m&limit=200`
 - `GET /market/indicators/{symbol}?interval=1m&limit=500` — indicadores técnicos (F2)
+- `GET /dashboard?fresh=false` — resumen del mercado seguido (F2)
 - `WS  /market/ws` — stream de precios en vivo (Redis pub/sub -> WebSocket)
 - `GET /watchlist` · `POST /watchlist` · `DELETE /watchlist/{asset_id}`
 - `GET /alerts` · `POST /alerts` · `PUT /alerts/{id}/enabled` · `DELETE /alerts/{id}`
@@ -105,7 +106,10 @@ Pendiente futuro (no bloquea F1):
       forex `fx:EUR/USD`. El worker agrupa por proveedor y lanza un stream por cada uno
       (Binance en vivo + Twelve Data por polling) a la vez. Backfill usa el proveedor correcto.
       Requiere `TWELVE_DATA_API_KEY` en `.env`.
-- [ ] Dashboard de inicio (estado global, top movers, mapa de calor).
+- [x] **Dashboard de inicio** (`GET /dashboard`, caché Redis 10s): resumen de la watchlist
+      (cambio %, máx/mín, volatilidad), top movers (subidas/bajadas) y más volátiles.
+      Métricas puras en `dashboard/metrics.py` con tests. La app tiene pantalla de Mercado
+      con navegación inferior (Mercado / Watchlist).
 - [ ] Más tipos de alerta (%, volatilidad, volumen, cruce de indicador).
 
 ### F3

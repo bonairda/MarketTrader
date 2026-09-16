@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../core/config.dart';
+import '../models/dashboard.dart';
 import '../models/indicators.dart';
 import '../models/live_price.dart';
 import '../models/price_bar.dart';
@@ -53,6 +54,13 @@ class MarketApi {
     final res = await _client.get(uri);
     _ensureOk(res);
     return Indicators.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  /// GET /dashboard -> resumen del mercado seguido.
+  Future<Dashboard> getDashboard() async {
+    final res = await _client.get(Uri.parse('$_base/dashboard'));
+    _ensureOk(res);
+    return Dashboard.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
 
   /// GET /watchlist -> símbolos seguidos.
