@@ -8,10 +8,10 @@ La dirección del cambio es siempre: 1 unidad de divisa original = N EUR.
 from __future__ import annotations
 
 from collections import defaultdict, deque
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import Iterable
 
 ZERO = Decimal("0")
 

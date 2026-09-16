@@ -157,7 +157,7 @@ def _map_trade_republic(content: str) -> list[dict]:
 def _map_revolut(content: str) -> list[dict]:
     """Extracto de Revolut (acciones), importes normalmente en USD."""
     rows: list[dict] = []
-    for index, raw in enumerate(_read_rows(content)):
+    for raw in _read_rows(content):
         side = _normalize_side(_get(raw, "Type", "Side"))
         ticker = _get(raw, "Ticker", "Symbol")
         if side is None or not ticker:

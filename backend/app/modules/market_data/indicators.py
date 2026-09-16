@@ -89,7 +89,7 @@ def macd(
     ema_slow = ema(values, slow)
     macd_line: list[float | None] = [
         (f - s) if (f is not None and s is not None) else None
-        for f, s in zip(ema_fast, ema_slow)
+        for f, s in zip(ema_fast, ema_slow, strict=False)
     ]
     # Señal: EMA del MACD sobre la parte no nula.
     macd_defined = [v for v in macd_line if v is not None]
@@ -101,7 +101,7 @@ def macd(
         signal_line[offset + i] = v
     histogram: list[float | None] = [
         (m - s) if (m is not None and s is not None) else None
-        for m, s in zip(macd_line, signal_line)
+        for m, s in zip(macd_line, signal_line, strict=False)
     ]
     return {"macd": macd_line, "signal": signal_line, "histogram": histogram}
 

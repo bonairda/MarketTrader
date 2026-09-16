@@ -4,8 +4,8 @@ import pytest
 
 from app.modules.market_data import indicators
 
-
 # ----------------------------- SMA -----------------------------
+
 
 def test_sma_basic():
     values = [1, 2, 3, 4, 5]

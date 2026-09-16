@@ -11,7 +11,7 @@ Todo se opera en Decimal; la cuantización se hace solo al serializar.
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 from app.core.db import SessionLocal
 from app.modules.fx import service as fx_service

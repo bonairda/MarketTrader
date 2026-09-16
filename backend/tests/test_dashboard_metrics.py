@@ -5,8 +5,8 @@ import pytest
 from app.modules.dashboard import metrics
 
 
-def _candle(o, h, l, c):
-    return {"open": o, "high": h, "low": l, "close": c}
+def _candle(o, h, low, c):
+    return {"open": o, "high": h, "low": low, "close": c}
 
 
 # ----------------------------- change_percent -----------------------------

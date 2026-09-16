@@ -39,17 +39,16 @@ class MarketApi {
   /// Notifica al gate de sesión si cualquier llamada detecta un JWT caducado.
   void Function()? onUnauthorized;
 
-  String? _token;
-
-  /// Establece (o limpia con null) el token de acceso usado en las cabeceras.
-  set authToken(String? token) => _token = token;
-  String? get authToken => _token;
+  /// Token de acceso (JWT) usado en las cabeceras. Se establece tras el login y
+  /// se limpia (null) al cerrar sesión.
+  String? authToken;
 
   Map<String, String> _headers({bool json = false}) {
     final headers = <String, String>{};
     if (json) headers['Content-Type'] = 'application/json';
-    if (_token != null && _token!.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $_token';
+    final token = authToken;
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
     }
     return headers;
   }

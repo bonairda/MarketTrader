@@ -1,6 +1,6 @@
 """Tests del motor FIFO fiscal puro."""
 
-from datetime import date, datetime, UTC
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest

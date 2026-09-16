@@ -7,7 +7,7 @@ import io
 import re
 import uuid
 from datetime import UTC, date, datetime
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from sqlalchemy.exc import IntegrityError
 
@@ -70,7 +70,7 @@ def _money(value: object) -> str:
 
 
 def _iso(value: object | None) -> str | None:
-    return value.isoformat() if isinstance(value, (date, datetime)) else value
+    return value.isoformat() if isinstance(value, date | datetime) else value
 
 
 def _validate_input(data: dict) -> dict:
@@ -377,7 +377,7 @@ def _serialize_disposal(disposal: dict) -> dict:
             result[key] = decimal_keys[key](value)
         elif key in money_keys:
             result[key] = _money(value)
-        elif isinstance(value, (date, datetime)):
+        elif isinstance(value, date | datetime):
             result[key] = value.isoformat()
         else:
             result[key] = value

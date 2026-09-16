@@ -8,7 +8,7 @@ import uuid
 import pytest
 
 from app.core.errors import AppError
-from app.core.security import decode_access_token, hash_password
+from app.core.security import decode_access_token
 from app.modules.auth import service as service_module
 
 

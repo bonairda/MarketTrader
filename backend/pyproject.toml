@@ -25,6 +25,22 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["B011"]
 
+[tool.ruff.lint.flake8-bugbear]
+# Patrón idiomático de FastAPI: las dependencias e inyecciones se declaran como
+# valores por defecto (Depends/Query/etc.). No es el antipatrón que persigue B008.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Header",
+    "fastapi.Cookie",
+    "fastapi.Form",
+    "fastapi.File",
+    "fastapi.Security",
+    "app.modules.auth.deps.require_role",
+]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

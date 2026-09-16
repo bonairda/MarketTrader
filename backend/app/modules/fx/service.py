@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 from datetime import date
 from decimal import Decimal
-
 from xml.etree.ElementTree import ParseError
 
 import httpx

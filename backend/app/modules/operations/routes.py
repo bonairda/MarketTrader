@@ -10,9 +10,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.core.errors import AppError
 from app.modules.auth.deps import CurrentUser, get_current_user
-from app.modules.operations import brokers
+from app.modules.operations import brokers, service
 from app.modules.operations import io as operations_io
-from app.modules.operations import service
 from app.providers.symbols import normalize_asset_id
 
 router = APIRouter(tags=["operations", "tax"])

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy.exc import IntegrityError
 
@@ -25,7 +25,7 @@ def _money(value: object) -> str:
 
 
 def _iso(value: object | None) -> str | None:
-    return value.isoformat() if isinstance(value, (date, datetime)) else value
+    return value.isoformat() if isinstance(value, date | datetime) else value
 
 
 async def _resolve_fx(currency: str, on: date, provided: Decimal | None) -> tuple[Decimal, str]:

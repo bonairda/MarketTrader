@@ -12,7 +12,7 @@ import io
 import json
 
 from app.core.errors import AppError
-from app.modules.operations import repository, service
+from app.modules.operations import service
 
 # Cabeceras del CSV de exportación (una fila por operación).
 _EXPORT_FIELDS = [
