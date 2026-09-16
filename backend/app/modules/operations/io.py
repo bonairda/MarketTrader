@@ -83,6 +83,11 @@ def _row_to_service_dict(row: dict) -> dict:
     return result
 
 
+def rows_to_service_dicts(rows: list[dict]) -> list[dict]:
+    """Convierte filas camelCase (p. ej. de un mapeador de broker) al servicio."""
+    return [_row_to_service_dict(row) for row in rows]
+
+
 def parse_import_payload(content: str, content_type: str) -> list[dict]:
     """Convierte CSV o JSON en filas normalizadas para el servicio."""
     if content_type == "json":

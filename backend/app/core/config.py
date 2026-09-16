@@ -75,6 +75,13 @@ class Settings(BaseSettings):
     )
     ecb_fx_cache_ttl_seconds: int = 60 * 60 * 12  # 12 horas
 
+    # Alpaca paper trading (SIN dinero real). Deshabilitado si no hay credenciales.
+    # Usa SIEMPRE el host de paper por defecto; nunca la operativa real por accidente.
+    alpaca_enabled: bool = False
+    alpaca_api_key: str = ""
+    alpaca_api_secret: str = ""
+    alpaca_base_url: str = "https://paper-api.alpaca.markets"
+
     @property
     def database_url(self) -> str:
         if self.database_url_override:

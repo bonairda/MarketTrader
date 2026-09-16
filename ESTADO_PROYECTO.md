@@ -90,6 +90,9 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 - `GET /operations` · `POST /operations` · `GET/DELETE /operations/{id}` — libro fiscal (F6)
 - `GET /operations/audit` — trazabilidad inmutable de altas y bajas (F6)
 - `GET /operations/export` · `POST /operations/import` — export/import CSV/JSON con dedupe
+- `GET /operations/brokers` · `POST /operations/import/broker` — import por broker (F7)
+- `GET/POST/DELETE /corporate-events` — dividendos (con retención) y splits (F7)
+- `GET /paper-trading/status|account|positions|orders` · `POST /paper-trading/orders` — Alpaca paper (F7)
 - `GET /tax/reports/{year}` · `GET /tax/reports/{year}/csv` — informe FIFO en EUR (F6)
 - `GET /portfolio/derived` — cartera derivada del libro (FIFO) valorada en EUR
 - `GET /fx/rate?currency=&on=` — tipo de cambio a EUR (BCE, con caché y fallback)
@@ -236,12 +239,31 @@ Pendiente futuro (no bloquea F1):
       homogéneos (±2 meses); marca las pérdidas afectadas en informe, resumen y app,
       sin alterar el cálculo (aviso informativo).
 
-### F7 — PENDIENTE
-- [ ] Mapeadores por broker (CaixaBank, Revolut, Trade Republic) sobre el importador
-      genérico, con normalización de columnas y previsualización específica.
-- [ ] **Alpaca paper trading** (sin dinero real), reconciliación de ejecuciones y
-      confirmación explícita. La operativa real solo después de revisión legal y de seguridad.
-- [ ] Reglas fiscales adicionales (diferimiento de pérdidas, dividendos, splits).
+### F7 — COMPLETA
+- [x] **Mapeadores de broker** (`operations/brokers.py`): genérico, Trade Republic y
+      Revolut. Traducen cada CSV a filas canónicas con `externalId` estable (idempotente),
+      normalizan importes en formato europeo, ignoran filas que no son compra/venta y dejan
+      que el backend resuelva el cambio a EUR si la divisa no es EUR. `GET /operations/brokers`
+      y `POST /operations/import/broker` (previsualización por defecto). La app permite elegir
+      el origen en el diálogo de importación.
+- [x] **Eventos corporativos** (`modules/corporate/`, tabla `corporate_events`, migración
+      0006): dividendos con retención (autorrelleno de FX) y splits (ratio), por usuario e
+      idempotentes por `external_id`. El informe fiscal incluye una sección de dividendos en
+      EUR (bruto/retención/neto). Nueva pantalla Flutter de eventos corporativos.
+- [x] **Alpaca paper trading** (opt-in, sin dinero real): `modules/paper_trading/` con cliente
+      que fuerza el host de paper, servicio que exige confirmación explícita y solo admite
+      acciones, y endpoints `GET /paper-trading/*` + `POST /paper-trading/orders` (rol OWNER).
+      Deshabilitado si no hay credenciales. Nueva pantalla Flutter con estado, órdenes y
+      envío confirmado.
+
+> El paper trading no usa dinero real. La operativa real seguirá requiriendo revisión
+> legal y de seguridad antes de plantearse.
+
+### F8 — PENDIENTE
+- [ ] Reglas fiscales adicionales (diferimiento de pérdidas por recompra ya marcado,
+      integración de splits en el ajuste FIFO de cantidades/coste, minoración por
+      dividendos en scrip).
+- [ ] Operativa real con broker (tras revisión legal/seguridad) y reconciliación.
 - [ ] Roles adicionales y producto comercial multiusuario.
 
 ## 5. Consolidación de la base (Bloques A, B y C — hechos)

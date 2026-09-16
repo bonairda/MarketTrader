@@ -6,9 +6,11 @@ import '../core/config.dart';
 import '../models/backtest.dart';
 import '../models/dashboard.dart';
 import '../models/indicators.dart';
+import '../models/corporate_event.dart';
 import '../models/derived_portfolio.dart';
 import '../models/live_price.dart';
 import '../models/operation.dart';
+import '../models/paper_trading.dart';
 import '../models/portfolio.dart';
 import '../models/price_bar.dart';
 import '../models/signal.dart';
@@ -192,6 +194,109 @@ class MarketApi {
     );
     _ensureOk(res);
     return ImportResult.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  /// GET /operations/brokers -> brokers soportados para importación por CSV.
+  Future<List<String>> getSupportedBrokers() async {
+    final res = await _client.get(
+      Uri.parse('$_base/operations/brokers'),
+      headers: _headers(),
+    );
+    _ensureOk(res);
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    return (data['brokers'] as List<dynamic>).map((e) => e.toString()).toList();
+  }
+
+  /// POST /operations/import/broker -> importa el CSV de un broker (dryRun opcional).
+  Future<ImportResult> importBrokerCsv({
+    required String broker,
+    required String content,
+    bool dryRun = true,
+  }) async {
+    final res = await _client.post(
+      Uri.parse('$_base/operations/import/broker'),
+      headers: _headers(json: true),
+      body: jsonEncode({'broker': broker, 'content': content, 'dryRun': dryRun}),
+    );
+    _ensureOk(res);
+    return ImportResult.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  // -------------------------- Eventos corporativos --------------------------
+
+  Future<List<CorporateEvent>> getCorporateEvents({int? year}) async {
+    final uri = Uri.parse('$_base/corporate-events').replace(
+      queryParameters: {if (year != null) 'year': '$year'},
+    );
+    final res = await _client.get(uri, headers: _headers());
+    _ensureOk(res);
+    final data = jsonDecode(res.body) as List<dynamic>;
+    return data
+        .map((e) => CorporateEvent.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<CorporateEvent> addCorporateEvent(NewCorporateEvent event) async {
+    final res = await _client.post(
+      Uri.parse('$_base/corporate-events'),
+      headers: _headers(json: true),
+      body: jsonEncode(event.toJson()),
+    );
+    _ensureOk(res);
+    return CorporateEvent.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  Future<void> deleteCorporateEvent(String id) async {
+    final res = await _client.delete(
+      Uri.parse('$_base/corporate-events/$id'),
+      headers: _headers(),
+    );
+    _ensureOk(res);
+  }
+
+  // -------------------------- Paper trading (Alpaca) --------------------------
+
+  Future<PaperTradingStatus> getPaperStatus() async {
+    final res = await _client.get(
+      Uri.parse('$_base/paper-trading/status'),
+      headers: _headers(),
+    );
+    _ensureOk(res);
+    return PaperTradingStatus.fromJson(
+      jsonDecode(res.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<List<PaperOrder>> getPaperOrders() async {
+    final res = await _client.get(
+      Uri.parse('$_base/paper-trading/orders'),
+      headers: _headers(),
+    );
+    _ensureOk(res);
+    final data = jsonDecode(res.body) as List<dynamic>;
+    return data
+        .map((e) => PaperOrder.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> submitPaperOrder({
+    required String assetId,
+    required String side,
+    required String quantity,
+    required bool confirm,
+  }) async {
+    final res = await _client.post(
+      Uri.parse('$_base/paper-trading/orders'),
+      headers: _headers(json: true),
+      body: jsonEncode({
+        'assetId': assetId,
+        'side': side,
+        'quantity': quantity,
+        'confirm': confirm,
+      }),
+    );
+    _ensureOk(res);
+    return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
   /// GET /portfolio/derived -> cartera calculada desde el libro (FIFO) en EUR.

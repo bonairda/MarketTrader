@@ -100,6 +100,27 @@ class TaxDisposal {
       );
 }
 
+class TaxDividends {
+  const TaxDividends({
+    required this.count,
+    required this.grossEur,
+    required this.withholdingEur,
+    required this.netEur,
+  });
+
+  final int count;
+  final String grossEur;
+  final String withholdingEur;
+  final String netEur;
+
+  factory TaxDividends.fromJson(Map<String, dynamic> json) => TaxDividends(
+        count: (json['count'] as num?)?.toInt() ?? 0,
+        grossEur: (json['grossEur'] ?? '0.00').toString(),
+        withholdingEur: (json['withholdingEur'] ?? '0.00').toString(),
+        netEur: (json['netEur'] ?? '0.00').toString(),
+      );
+}
+
 class TaxReport {
   const TaxReport({
     required this.year,
@@ -108,6 +129,7 @@ class TaxReport {
     required this.assets,
     required this.disposals,
     required this.disclaimer,
+    this.dividends,
   });
 
   final int year;
@@ -116,6 +138,7 @@ class TaxReport {
   final List<TaxAssetSummary> assets;
   final List<TaxDisposal> disposals;
   final String disclaimer;
+  final TaxDividends? dividends;
 
   factory TaxReport.fromJson(Map<String, dynamic> json) => TaxReport(
         year: (json['year'] as num).toInt(),
@@ -128,5 +151,8 @@ class TaxReport {
             .map((e) => TaxDisposal.fromJson(e as Map<String, dynamic>))
             .toList(),
         disclaimer: json['disclaimer'].toString(),
+        dividends: json['dividends'] == null
+            ? null
+            : TaxDividends.fromJson(json['dividends'] as Map<String, dynamic>),
       );
 }

@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.db import SessionLocal
 from app.core.errors import AppError, NotFoundError
+from app.modules.corporate import service as corporate_service
 from app.modules.fx import service as fx_service
 from app.modules.operations import repository
 from app.modules.operations.fifo import (
@@ -488,9 +489,12 @@ async def get_tax_report(user_id: str, year: int) -> dict:
     async with SessionLocal() as session:
         operations = await repository.list_book(session, user_id, through_year=year)
     try:
-        return serialize_tax_report(build_tax_report(operations, year))
+        report = serialize_tax_report(build_tax_report(operations, year))
     except InsufficientHoldingsError as exc:
         raise AppError(str(exc), code="INVALID_OPERATION_BOOK", status_code=409) from exc
+    # Dividendos del ejercicio (sección aparte de las plusvalías FIFO).
+    report["dividends"] = await corporate_service.dividend_summary(user_id, year)
+    return report
 
 
 def tax_report_csv(report: dict) -> str:

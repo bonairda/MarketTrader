@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.core.errors import AppError
 from app.modules.auth.deps import CurrentUser, get_current_user
+from app.modules.operations import brokers
 from app.modules.operations import io as operations_io
 from app.modules.operations import service
 from app.providers.symbols import normalize_asset_id
@@ -126,6 +127,35 @@ async def import_operations(
             code="IMPORT_TOO_LARGE",
             status_code=422,
         )
+    return await operations_io.import_operations(user.id, rows, dry_run=body.dryRun)
+
+
+class BrokerImportIn(BaseModel):
+    broker: str = Field(pattern="^(generic|trade_republic|revolut)$")
+    content: str = Field(min_length=1)
+    dryRun: bool = True
+
+
+@router.get("/operations/brokers")
+async def supported_brokers(
+    user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    return {"brokers": list(brokers.SUPPORTED_BROKERS)}
+
+
+@router.post("/operations/import/broker")
+async def import_broker_csv(
+    body: BrokerImportIn, user: CurrentUser = Depends(get_current_user)
+) -> dict:
+    """Importa el CSV de un broker soportado. Por defecto en modo previsualización."""
+    mapped = brokers.map_broker_csv(body.broker, body.content)
+    if len(mapped) > 5000:
+        raise AppError(
+            "Máximo 5000 operaciones por importación",
+            code="IMPORT_TOO_LARGE",
+            status_code=422,
+        )
+    rows = operations_io.rows_to_service_dicts(mapped)
     return await operations_io.import_operations(user.id, rows, dry_run=body.dryRun)
 
 

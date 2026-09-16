@@ -170,6 +170,23 @@ class _TaxReportScreenState extends State<TaxReportScreen> {
               ),
             ),
           ),
+        if (report.dividends != null && report.dividends!.count > 0)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Dividendos ${report.year}',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  _row('Nº de dividendos', '${report.dividends!.count}'),
+                  _row('Bruto', '${report.dividends!.grossEur} EUR'),
+                  _row('Retención', '${report.dividends!.withholdingEur} EUR'),
+                  _row('Neto', '${report.dividends!.netEur} EUR'),
+                ],
+              ),
+            ),
+          ),
         const SizedBox(height: 8),
         Text('Por activo', style: Theme.of(context).textTheme.titleMedium),
         if (report.assets.isEmpty)

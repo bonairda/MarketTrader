@@ -211,3 +211,53 @@ class OperationAuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class CorporateEvent(Base):
+    """Evento corporativo del usuario: dividendo (con retención) o split.
+
+    - DIVIDEND: `gross_amount_original`/`withholding_original` en `currency`,
+      con `fx_rate_to_eur` para el cálculo en EUR. `quantity`/`ratio` no aplican.
+    - SPLIT: `ratio` = nuevas acciones por cada antigua (2 = 2:1; 0.5 = 1:2).
+    """
+
+    __tablename__ = "corporate_events"
+    __table_args__ = (
+        CheckConstraint(
+            "type IN ('DIVIDEND', 'SPLIT')", name="ck_corporate_events_type"
+        ),
+        Index(
+            "ix_corporate_events_user_asset_date",
+            "user_id",
+            "asset_id",
+            "event_date",
+        ),
+        Index(
+            "ux_corporate_events_user_external_id",
+            "user_id",
+            "external_id",
+            unique=True,
+            postgresql_where=text("external_id IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    asset_id: Mapped[str] = mapped_column(String, nullable=False)
+    type: Mapped[str] = mapped_column(String, nullable=False)
+    event_date: Mapped[date] = mapped_column(Date, nullable=False)
+    # Dividendos
+    gross_amount_original: Mapped[Decimal | None] = mapped_column(Numeric(30, 12))
+    withholding_original: Mapped[Decimal | None] = mapped_column(Numeric(30, 12))
+    currency: Mapped[str | None] = mapped_column(String(12))
+    fx_rate_to_eur: Mapped[Decimal | None] = mapped_column(Numeric(24, 12))
+    # Splits
+    ratio: Mapped[Decimal | None] = mapped_column(Numeric(24, 12))
+    fx_source: Mapped[str | None] = mapped_column(String, nullable=True)
+    external_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    notes: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

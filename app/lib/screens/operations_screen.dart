@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 import '../models/operation.dart';
 import '../services/market_api.dart';
+import 'corporate_events_screen.dart';
+import 'paper_trading_screen.dart';
 import 'tax_report_screen.dart';
 
 /// Libro fiscal de compras y ventas. Es independiente de la cartera simulada:
@@ -235,6 +237,23 @@ class _OperationsScreenState extends State<OperationsScreen> {
             onPressed: _importExport,
             icon: const Icon(Icons.import_export),
             tooltip: 'Importar / exportar',
+          ),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'corporate') {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => CorporateEventsScreen(api: widget.api),
+                ));
+              } else if (value == 'paper') {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => PaperTradingScreen(api: widget.api),
+                ));
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'corporate', child: Text('Eventos corporativos')),
+              PopupMenuItem(value: 'paper', child: Text('Paper trading')),
+            ],
           ),
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
         ],
@@ -530,6 +549,7 @@ class _ImportDialog extends StatefulWidget {
 class _ImportDialogState extends State<_ImportDialog> {
   final _content = TextEditingController();
   String _format = 'json';
+  String _broker = 'none';
   bool _busy = false;
   String? _message;
 
@@ -549,11 +569,17 @@ class _ImportDialogState extends State<_ImportDialog> {
       _message = null;
     });
     try {
-      final result = await widget.api.importOperations(
-        content: _content.text,
-        format: _format,
-        dryRun: dryRun,
-      );
+      final result = _broker == 'none'
+          ? await widget.api.importOperations(
+              content: _content.text,
+              format: _format,
+              dryRun: dryRun,
+            )
+          : await widget.api.importBrokerCsv(
+              broker: _broker,
+              content: _content.text,
+              dryRun: dryRun,
+            );
       if (!mounted) return;
       if (dryRun) {
         setState(() {
@@ -583,14 +609,28 @@ class _ImportDialogState extends State<_ImportDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             DropdownButtonFormField<String>(
-              initialValue: _format,
-              decoration: const InputDecoration(labelText: 'Formato'),
+              initialValue: _broker,
+              decoration: const InputDecoration(labelText: 'Origen'),
               items: const [
-                DropdownMenuItem(value: 'json', child: Text('JSON')),
-                DropdownMenuItem(value: 'csv', child: Text('CSV')),
+                DropdownMenuItem(value: 'none', child: Text('Genérico (JSON/CSV propio)')),
+                DropdownMenuItem(value: 'generic', child: Text('Broker: genérico')),
+                DropdownMenuItem(
+                    value: 'trade_republic', child: Text('Broker: Trade Republic')),
+                DropdownMenuItem(value: 'revolut', child: Text('Broker: Revolut')),
               ],
-              onChanged: (value) => setState(() => _format = value ?? 'json'),
+              onChanged: (value) => setState(() => _broker = value ?? 'none'),
             ),
+            const SizedBox(height: 12),
+            if (_broker == 'none')
+              DropdownButtonFormField<String>(
+                initialValue: _format,
+                decoration: const InputDecoration(labelText: 'Formato'),
+                items: const [
+                  DropdownMenuItem(value: 'json', child: Text('JSON')),
+                  DropdownMenuItem(value: 'csv', child: Text('CSV')),
+                ],
+                onChanged: (value) => setState(() => _format = value ?? 'json'),
+              ),
             const SizedBox(height: 12),
             TextField(
               controller: _content,
