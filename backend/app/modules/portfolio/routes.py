@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from app.core.errors import NotFoundError
 from app.modules.auth.deps import CurrentUser, get_current_user
-from app.modules.portfolio import repository, service
+from app.modules.portfolio import derived, repository, service
 from app.providers import symbols as symbol_utils
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
@@ -20,6 +20,14 @@ class PositionIn(BaseModel):
 @router.get("")
 async def get_portfolio(user: CurrentUser = Depends(get_current_user)) -> dict:
     return await service.get_portfolio(user.id)
+
+
+@router.get("/derived")
+async def get_derived_portfolio(
+    user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """Cartera calculada desde el libro de operaciones (FIFO) y valorada en EUR."""
+    return await derived.get_derived_portfolio(user.id)
 
 
 @router.post("/positions", status_code=201)

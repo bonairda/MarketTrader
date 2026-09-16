@@ -138,6 +138,38 @@ class _TaxReportScreenState extends State<TaxReportScreen> {
             ),
           ),
         ),
+        if (report.summary.washSaleDisposals > 0)
+          Card(
+            color: Colors.amber.shade100,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.warning_amber, color: Colors.amber.shade900),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Posible recompra de valores homogéneos',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${report.summary.washSaleDisposals} pérdida(s) por '
+                    '${report.summary.washSaleAdjustmentEur} EUR podrían no ser '
+                    'computables este ejercicio por la regla AEAT de valores '
+                    'homogéneos (±2 meses). Revísalo con tu asesor.',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
         const SizedBox(height: 8),
         Text('Por activo', style: Theme.of(context).textTheme.titleMedium),
         if (report.assets.isEmpty)
@@ -168,11 +200,16 @@ class _TaxReportScreenState extends State<TaxReportScreen> {
         ...report.disposals.map(
           (row) => Card(
             child: ListTile(
+              leading: row.washSale
+                  ? Icon(Icons.warning_amber, color: Colors.amber.shade900)
+                  : null,
               title: Text('${row.assetId.toUpperCase()} · ${row.matchedQuantity}'),
               subtitle: Text(
                 'Compra ${row.acquisitionDate} → venta ${row.saleDate}\n'
-                'Adquisición ${row.acquisitionCostEur} · transmisión ${row.proceedsEur} EUR',
+                'Adquisición ${row.acquisitionCostEur} · transmisión ${row.proceedsEur} EUR'
+                '${row.washSale ? '\nPosible recompra homogénea: pérdida no computable' : ''}',
               ),
+              isThreeLine: row.washSale,
               trailing: Text('${row.gainEur} EUR'),
             ),
           ),

@@ -89,7 +89,10 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 - `POST /portfolio/positions` · `DELETE /portfolio/positions/{id}` — CRUD de posiciones (F4)
 - `GET /operations` · `POST /operations` · `GET/DELETE /operations/{id}` — libro fiscal (F6)
 - `GET /operations/audit` — trazabilidad inmutable de altas y bajas (F6)
+- `GET /operations/export` · `POST /operations/import` — export/import CSV/JSON con dedupe
 - `GET /tax/reports/{year}` · `GET /tax/reports/{year}/csv` — informe FIFO en EUR (F6)
+- `GET /portfolio/derived` — cartera derivada del libro (FIFO) valorada en EUR
+- `GET /fx/rate?currency=&on=` — tipo de cambio a EUR (BCE, con caché y fallback)
 - `WS  /market/ws?token=<jwt>` — precios de la watchlist del usuario
 - `GET /watchlist` · `POST /watchlist` · `DELETE /watchlist/{asset_id}`
 - `GET /alerts` · `POST /alerts` · `PUT /alerts/{id}/enabled` · `DELETE /alerts/{id}`
@@ -214,16 +217,31 @@ Pendiente futuro (no bloquea F1):
 - [x] **Tests**: precisión Decimal, fees, divisas, multilote, saldo insuficiente,
       orden temporal, ejercicios, validaciones, aislamiento y equivalencia JSON/CSV.
 
-> El informe es un borrador informativo. No sustituye asesoramiento fiscal ni
-> implementa todavía todas las reglas AEAT (por ejemplo, recompra de valores
-> homogéneos y diferimiento de pérdidas).
+> El informe es un borrador informativo. No sustituye asesoramiento fiscal.
+
+### Mejoras avanzadas (sobre F6) — COMPLETAS
+- [x] **Tipos de cambio automáticos (BCE)**: `modules/fx/` (parser puro `ecb.py`,
+      servicio con caché Redis, fallback al último día hábil y alias USDT/USDC→USD).
+      `GET /fx/rate`. Al crear una operación con fuente ECB y sin tasa, el cambio a
+      EUR se autorrellena por fecha.
+- [x] **Importación/exportación** (`operations/io.py`): export JSON/CSV y `POST
+      /operations/import` con dry-run, `user_id` siempre del token y deduplicación
+      por `external_id`. La app importa/exporta desde la pestaña Operaciones.
+- [x] **Cartera derivada del libro** (`portfolio/derived.py`, `GET /portfolio/derived`):
+      posiciones abiertas por FIFO valoradas en EUR con precio en vivo + cambio del BCE,
+      todo en Decimal. La app muestra un selector Derivada/Simulada.
+- [x] **Paginación incremental** de operaciones: `/operations` devuelve
+      `items/total/hasMore/nextOffset`; la app hace scroll infinito.
+- [x] **Fiscalidad AEAT ampliada**: detección de posible recompra de valores
+      homogéneos (±2 meses); marca las pérdidas afectadas en informe, resumen y app,
+      sin alterar el cálculo (aviso informativo).
 
 ### F7 — PENDIENTE
-- [ ] Importadores CSV para brokers sin API pública (CaixaBank, Revolut,
-      Trade Republic), con previsualización y deduplicación por `external_id`.
+- [ ] Mapeadores por broker (CaixaBank, Revolut, Trade Republic) sobre el importador
+      genérico, con normalización de columnas y previsualización específica.
 - [ ] **Alpaca paper trading** (sin dinero real), reconciliación de ejecuciones y
       confirmación explícita. La operativa real solo después de revisión legal y de seguridad.
-- [ ] Cartera derivada del libro fiscal y valoración multidivisa en EUR.
+- [ ] Reglas fiscales adicionales (diferimiento de pérdidas, dividendos, splits).
 - [ ] Roles adicionales y producto comercial multiusuario.
 
 ## 5. Consolidación de la base (Bloques A, B y C — hechos)

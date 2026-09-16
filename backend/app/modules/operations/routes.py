@@ -8,7 +8,9 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.errors import AppError
 from app.modules.auth.deps import CurrentUser, get_current_user
+from app.modules.operations import io as operations_io
 from app.modules.operations import service
 from app.providers.symbols import normalize_asset_id
 
@@ -27,7 +29,10 @@ class OperationIn(BaseModel):
         default=Decimal("0"), ge=0, max_digits=30, decimal_places=12
     )
     currency: str = Field(min_length=3, max_length=12)
-    fxRateToEur: Decimal = Field(gt=0, max_digits=24, decimal_places=12)
+    # Opcional: si falta y fxSource=ECB, se resuelve automáticamente por fecha.
+    fxRateToEur: Decimal | None = Field(
+        default=None, gt=0, max_digits=24, decimal_places=12
+    )
     fxSource: str | None = Field(default="USER", max_length=80)
     source: str = Field(default="MANUAL", max_length=80)
     externalId: str | None = Field(default=None, max_length=250)
@@ -65,8 +70,8 @@ async def list_operations(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     user: CurrentUser = Depends(get_current_user),
-) -> list[dict]:
-    return await service.list_operations(
+) -> dict:
+    return await service.list_operations_page(
         user.id,
         asset_id=normalize_asset_id(asset_id) if asset_id else None,
         side=side,
@@ -81,6 +86,47 @@ async def create_operation(
     body: OperationIn, user: CurrentUser = Depends(get_current_user)
 ) -> dict:
     return await service.create_operation(user.id, body.to_service_dict())
+
+
+class ImportIn(BaseModel):
+    format: str = Field(default="json", pattern="^(json|csv)$")
+    content: str = Field(min_length=1)
+    dryRun: bool = False
+
+
+@router.get("/operations/export")
+async def export_operations(
+    format: str = Query(default="json", pattern="^(json|csv)$"),
+    user: CurrentUser = Depends(get_current_user),
+) -> Response:
+    operations = await operations_io.export_operations(user.id)
+    if format == "csv":
+        content = operations_io.export_csv(operations)
+        media_type = "text/csv; charset=utf-8"
+        filename = "markettracker-operaciones.csv"
+    else:
+        content = operations_io.export_json(operations)
+        media_type = "application/json; charset=utf-8"
+        filename = "markettracker-operaciones.json"
+    return Response(
+        content=content.encode("utf-8"),
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/operations/import")
+async def import_operations(
+    body: ImportIn, user: CurrentUser = Depends(get_current_user)
+) -> dict:
+    rows = operations_io.parse_import_payload(body.content, body.format)
+    if len(rows) > 5000:
+        raise AppError(
+            "Máximo 5000 operaciones por importación",
+            code="IMPORT_TOO_LARGE",
+            status_code=422,
+        )
+    return await operations_io.import_operations(user.id, rows, dry_run=body.dryRun)
 
 
 @router.get("/operations/audit")

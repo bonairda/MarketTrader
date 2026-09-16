@@ -69,6 +69,7 @@ class InvestmentOperation {
 }
 
 /// Payload para crear una operación.
+/// Si [fxRateToEur] es null y [fxSource] es ECB, el backend resuelve el cambio.
 class NewInvestmentOperation {
   const NewInvestmentOperation({
     required this.assetId,
@@ -79,7 +80,7 @@ class NewInvestmentOperation {
     required this.grossAmountOriginal,
     required this.feesOriginal,
     required this.currency,
-    required this.fxRateToEur,
+    this.fxRateToEur,
     this.fxSource = 'USER',
     this.source = 'MANUAL',
     this.notes,
@@ -93,7 +94,7 @@ class NewInvestmentOperation {
   final String grossAmountOriginal;
   final String feesOriginal;
   final String currency;
-  final String fxRateToEur;
+  final String? fxRateToEur;
   final String fxSource;
   final String source;
   final String? notes;
@@ -107,9 +108,60 @@ class NewInvestmentOperation {
         'grossAmountOriginal': grossAmountOriginal,
         'feesOriginal': feesOriginal,
         'currency': currency,
-        'fxRateToEur': fxRateToEur,
+        if (fxRateToEur != null && fxRateToEur!.isNotEmpty) 'fxRateToEur': fxRateToEur,
         'fxSource': fxSource,
         'source': source,
         if (notes != null && notes!.isNotEmpty) 'notes': notes,
       };
+}
+
+/// Página de operaciones con metadatos para scroll incremental.
+class OperationPage {
+  const OperationPage({
+    required this.items,
+    required this.total,
+    required this.hasMore,
+    required this.nextOffset,
+  });
+
+  final List<InvestmentOperation> items;
+  final int total;
+  final bool hasMore;
+  final int? nextOffset;
+
+  factory OperationPage.fromJson(Map<String, dynamic> json) => OperationPage(
+        items: (json['items'] as List<dynamic>)
+            .map((e) => InvestmentOperation.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        total: (json['total'] as num).toInt(),
+        hasMore: json['hasMore'] as bool? ?? false,
+        nextOffset: json['nextOffset'] == null
+            ? null
+            : (json['nextOffset'] as num).toInt(),
+      );
+}
+
+/// Resultado de una importación de operaciones.
+class ImportResult {
+  const ImportResult({
+    required this.dryRun,
+    required this.received,
+    required this.created,
+    required this.skipped,
+    required this.failed,
+  });
+
+  final bool dryRun;
+  final int received;
+  final int created;
+  final int skipped;
+  final int failed;
+
+  factory ImportResult.fromJson(Map<String, dynamic> json) => ImportResult(
+        dryRun: json['dryRun'] as bool? ?? false,
+        received: (json['received'] as num).toInt(),
+        created: (json['created'] as num).toInt(),
+        skipped: (json['skipped'] as num).toInt(),
+        failed: (json['failed'] as num).toInt(),
+      );
 }

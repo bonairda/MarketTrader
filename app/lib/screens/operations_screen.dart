@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/operation.dart';
 import '../services/market_api.dart';
@@ -16,14 +17,34 @@ class OperationsScreen extends StatefulWidget {
 }
 
 class _OperationsScreenState extends State<OperationsScreen> {
-  List<InvestmentOperation> _operations = [];
+  static const _pageSize = 50;
+  final List<InvestmentOperation> _operations = [];
+  final ScrollController _scroll = ScrollController();
+
   bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = false;
+  int _offset = 0;
+  int _total = 0;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _scroll.addListener(_onScroll);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 300) {
+      _loadMore();
+    }
   }
 
   Future<void> _load() async {
@@ -32,10 +53,15 @@ class _OperationsScreenState extends State<OperationsScreen> {
       _error = null;
     });
     try {
-      final operations = await widget.api.getOperations(limit: 500);
+      final page = await widget.api.getOperations(limit: _pageSize, offset: 0);
       if (!mounted) return;
       setState(() {
-        _operations = operations;
+        _operations
+          ..clear()
+          ..addAll(page.items);
+        _offset = page.nextOffset ?? _operations.length;
+        _hasMore = page.hasMore;
+        _total = page.total;
         _loading = false;
       });
     } catch (e) {
@@ -45,6 +71,95 @@ class _OperationsScreenState extends State<OperationsScreen> {
         _loading = false;
       });
     }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    setState(() => _loadingMore = true);
+    try {
+      final page =
+          await widget.api.getOperations(limit: _pageSize, offset: _offset);
+      if (!mounted) return;
+      setState(() {
+        _operations.addAll(page.items);
+        _offset = page.nextOffset ?? _operations.length;
+        _hasMore = page.hasMore;
+        _total = page.total;
+      });
+    } catch (_) {
+      // Silencioso: el usuario puede reintentar con pull-to-refresh.
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  Future<void> _importExport() async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.download),
+              title: const Text('Exportar (JSON)'),
+              onTap: () => Navigator.pop(context, 'export_json'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.table_view),
+              title: const Text('Exportar (CSV)'),
+              onTap: () => Navigator.pop(context, 'export_csv'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.upload),
+              title: const Text('Importar (pegar JSON/CSV)'),
+              onTap: () => Navigator.pop(context, 'import'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (action == 'export_json') {
+      await _export('json');
+    } else if (action == 'export_csv') {
+      await _export('csv');
+    } else if (action == 'import') {
+      await _import();
+    }
+  }
+
+  Future<void> _export(String format) async {
+    try {
+      final content = await widget.api.exportOperations(format: format);
+      await Clipboard.setData(ClipboardData(text: content));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Exportación $format copiada al portapapeles')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo exportar: $e')),
+      );
+    }
+  }
+
+  Future<void> _import() async {
+    final result = await showDialog<ImportResult>(
+      context: context,
+      builder: (_) => _ImportDialog(api: widget.api),
+    );
+    if (result == null) return;
+    await _load();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Importadas ${result.created}, omitidas ${result.skipped}, '
+          'con error ${result.failed}',
+        ),
+      ),
+    );
   }
 
   Future<void> _add() async {
@@ -116,6 +231,11 @@ class _OperationsScreenState extends State<OperationsScreen> {
             icon: const Icon(Icons.receipt_long),
             tooltip: 'Informe fiscal',
           ),
+          IconButton(
+            onPressed: _importExport,
+            icon: const Icon(Icons.import_export),
+            tooltip: 'Importar / exportar',
+          ),
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
         ],
       ),
@@ -146,20 +266,30 @@ class _OperationsScreenState extends State<OperationsScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
+        controller: _scroll,
         padding: const EdgeInsets.all(12),
-        itemCount: _operations.length + 1,
+        itemCount: _operations.length + 2,
         itemBuilder: (context, index) {
           if (index == 0) {
-            return const Card(
+            return Card(
               child: Padding(
-                padding: EdgeInsets.all(12),
+                padding: const EdgeInsets.all(12),
                 child: Text(
                   'Libro fiscal manual, separado de la cartera simulada. '
-                  'El cambio indica cuántos EUR equivalen a 1 unidad de divisa.',
-                  style: TextStyle(fontSize: 12),
+                  'Mostrando ${_operations.length} de $_total operaciones.',
+                  style: const TextStyle(fontSize: 12),
                 ),
               ),
             );
+          }
+          if (index == _operations.length + 1) {
+            if (_loadingMore) {
+              return const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            return const SizedBox(height: 24);
           }
           final operation = _operations[index - 1];
           final color = operation.isBuy ? Colors.blue.shade700 : Colors.orange.shade800;
@@ -207,10 +337,10 @@ class _OperationDialogState extends State<_OperationDialog> {
   final _gross = TextEditingController();
   final _fees = TextEditingController(text: '0');
   final _currency = TextEditingController(text: 'EUR');
-  final _fx = TextEditingController(text: '1');
-  final _fxSource = TextEditingController(text: 'USER');
+  final _fx = TextEditingController();
   final _notes = TextEditingController();
   String _side = 'BUY';
+  String _fxSource = 'ECB';
   DateTime _date = DateTime.now();
 
   @override
@@ -223,7 +353,6 @@ class _OperationDialogState extends State<_OperationDialog> {
       _fees,
       _currency,
       _fx,
-      _fxSource,
       _notes,
     ]) {
       controller.dispose();
@@ -261,6 +390,9 @@ class _OperationDialogState extends State<_OperationDialog> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     final gross = _gross.text.trim().replaceAll(',', '.');
+    final fxText = _fx.text.trim().replaceAll(',', '.');
+    // Con fuente ECB y sin tasa, el backend resuelve el cambio automáticamente.
+    final autoFx = _fxSource == 'ECB' && fxText.isEmpty;
     Navigator.of(context).pop(
       NewInvestmentOperation(
         assetId: _asset.text.trim(),
@@ -271,8 +403,8 @@ class _OperationDialogState extends State<_OperationDialog> {
         grossAmountOriginal: gross,
         feesOriginal: _fees.text.trim().replaceAll(',', '.'),
         currency: _currency.text.trim().toUpperCase(),
-        fxRateToEur: _fx.text.trim().replaceAll(',', '.'),
-        fxSource: _fxSource.text.trim().toUpperCase(),
+        fxRateToEur: autoFx ? null : fxText,
+        fxSource: _fxSource,
         notes: _notes.text.trim(),
       ),
     );
@@ -332,15 +464,27 @@ class _OperationDialogState extends State<_OperationDialog> {
                       ? 'Código de divisa no válido'
                       : null,
                 ),
+                DropdownButtonFormField<String>(
+                  initialValue: _fxSource,
+                  decoration: const InputDecoration(labelText: 'Fuente del cambio'),
+                  items: const [
+                    DropdownMenuItem(value: 'ECB', child: Text('Automático (BCE)')),
+                    DropdownMenuItem(value: 'USER', child: Text('Manual')),
+                  ],
+                  onChanged: (value) => setState(() => _fxSource = value ?? 'ECB'),
+                ),
                 _decimalField(
                   _fx,
-                  'Cambio a EUR',
-                  _positive,
+                  _fxSource == 'ECB'
+                      ? 'Cambio a EUR (opcional, se resuelve solo)'
+                      : 'Cambio a EUR',
+                  (value) {
+                    if (_fxSource == 'ECB' && (value ?? '').trim().isEmpty) {
+                      return null;
+                    }
+                    return _positive(value);
+                  },
                   helper: '1 unidad de la divisa = N EUR',
-                ),
-                TextFormField(
-                  controller: _fxSource,
-                  decoration: const InputDecoration(labelText: 'Fuente del cambio'),
                 ),
                 TextFormField(
                   controller: _notes,
@@ -371,4 +515,113 @@ class _OperationDialogState extends State<_OperationDialog> {
         decoration: InputDecoration(labelText: label, helperText: helper),
         validator: validator,
       );
+}
+
+
+class _ImportDialog extends StatefulWidget {
+  const _ImportDialog({required this.api});
+
+  final MarketApi api;
+
+  @override
+  State<_ImportDialog> createState() => _ImportDialogState();
+}
+
+class _ImportDialogState extends State<_ImportDialog> {
+  final _content = TextEditingController();
+  String _format = 'json';
+  bool _busy = false;
+  String? _message;
+
+  @override
+  void dispose() {
+    _content.dispose();
+    super.dispose();
+  }
+
+  Future<void> _run({required bool dryRun}) async {
+    if (_content.text.trim().isEmpty) {
+      setState(() => _message = 'Pega el contenido a importar');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    try {
+      final result = await widget.api.importOperations(
+        content: _content.text,
+        format: _format,
+        dryRun: dryRun,
+      );
+      if (!mounted) return;
+      if (dryRun) {
+        setState(() {
+          _busy = false;
+          _message = 'Previsualización: ${result.created} válidas, '
+              '${result.skipped} duplicadas, ${result.failed} con error';
+        });
+      } else {
+        Navigator.of(context).pop(result);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _message = 'Error: $e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Importar operaciones'),
+      content: SizedBox(
+        width: 520,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<String>(
+              initialValue: _format,
+              decoration: const InputDecoration(labelText: 'Formato'),
+              items: const [
+                DropdownMenuItem(value: 'json', child: Text('JSON')),
+                DropdownMenuItem(value: 'csv', child: Text('CSV')),
+              ],
+              onChanged: (value) => setState(() => _format = value ?? 'json'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _content,
+              maxLines: 8,
+              decoration: const InputDecoration(
+                labelText: 'Contenido',
+                helperText: 'Cada operación necesita externalId único para evitar duplicados',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            if (_message != null) ...[
+              const SizedBox(height: 12),
+              Text(_message!, style: const TextStyle(fontSize: 12)),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        TextButton(
+          onPressed: _busy ? null : () => _run(dryRun: true),
+          child: const Text('Previsualizar'),
+        ),
+        FilledButton(
+          onPressed: _busy ? null : () => _run(dryRun: false),
+          child: const Text('Importar'),
+        ),
+      ],
+    );
+  }
 }

@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.db import SessionLocal
 from app.core.errors import AppError, NotFoundError
+from app.modules.fx import service as fx_service
 from app.modules.operations import repository
 from app.modules.operations.fifo import (
     InsufficientHoldingsError,
@@ -190,6 +191,38 @@ async def list_operations(user_id: str, **filters) -> list[dict]:
     return [serialize_operation(row) for row in rows]
 
 
+async def list_operations_page(
+    user_id: str,
+    *,
+    asset_id: str | None = None,
+    side: str | None = None,
+    year: int | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> dict:
+    """Página de operaciones con metadatos para scroll incremental."""
+    items = await list_operations(
+        user_id,
+        asset_id=asset_id,
+        side=side,
+        year=year,
+        limit=limit,
+        offset=offset,
+    )
+    total = await repository.count_operations(
+        user_id, asset_id=asset_id, side=side, year=year
+    )
+    next_offset = offset + len(items)
+    return {
+        "items": items,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "hasMore": next_offset < total,
+        "nextOffset": next_offset if next_offset < total else None,
+    }
+
+
 async def get_operation(user_id: str, operation_id: str) -> dict:
     operation = await repository.get_operation(user_id, operation_id)
     if not operation:
@@ -204,7 +237,42 @@ def _integrity_constraint(exc: IntegrityError) -> str | None:
     )
 
 
+async def _resolve_fx_if_missing(data: dict) -> dict:
+    """Autorrellena fx_rate_to_eur desde el BCE cuando no se ha proporcionado.
+
+    Solo actúa si falta la tasa. La fuente declarada pasa a reflejar el origen
+    real (ECB o su aproximación). Si el BCE no resuelve, se exige tasa manual.
+    """
+    if data.get("fx_rate_to_eur") is not None:
+        return data
+    trade_date = data["trade_date"]
+    if not isinstance(trade_date, date):
+        trade_date = date.fromisoformat(str(trade_date))
+    resolved = await fx_service.get_rate_to_eur(str(data["currency"]), trade_date)
+    if resolved is None:
+        raise AppError(
+            "No se pudo obtener el tipo de cambio; indícalo manualmente",
+            code="FX_UNAVAILABLE",
+            status_code=422,
+        )
+    enriched = dict(data)
+    enriched["fx_rate_to_eur"] = Decimal(resolved["rate"])
+    enriched["fx_source"] = resolved["source"]
+    return enriched
+
+
+async def prepare_import_row(data: dict) -> dict:
+    """Resuelve el FX de una fila de importación (para dry-run)."""
+    return await _resolve_fx_if_missing(data)
+
+
+def validate_prepared(data: dict) -> dict:
+    """Valida la forma/importes de una fila ya con FX resuelto (dry-run)."""
+    return _validate_input(data)
+
+
 async def create_operation(user_id: str, data: dict) -> dict:
+    data = await _resolve_fx_if_missing(data)
     values = _validate_input(data)
     values.update({"id": str(uuid.uuid4()), "user_id": user_id})
     try:
@@ -381,6 +449,13 @@ def serialize_tax_report(report: dict) -> dict:
         ),
         "realizedGainEur": _money(
             sum((_decimal(d["gainEur"]) for d in disposals), Decimal("0"))
+        ),
+        "washSaleDisposals": sum(1 for d in disposals if d.get("washSale")),
+        "washSaleAdjustmentEur": _money(
+            sum(
+                (-_decimal(d["gainEur"]) for d in disposals if d.get("washSale")),
+                Decimal("0"),
+            )
         ),
     }
     open_lots = [

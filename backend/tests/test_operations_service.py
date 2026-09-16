@@ -181,3 +181,67 @@ def test_report_totals_reconcile_with_rounded_disposals():
     disposal_total = sum(Decimal(row["gainEur"]) for row in report["disposals"])
     asset_total = sum(Decimal(row["realizedGainEur"]) for row in report["assets"])
     assert Decimal(report["summary"]["realizedGainEur"]) == disposal_total == asset_total
+
+
+async def test_list_operations_page_reports_has_more(monkeypatch):
+    async def fake_list(user_id, **filters):
+        return [_row(f"op{i}") for i in range(filters["limit"])]
+
+    async def fake_count(user_id, **filters):
+        return 130
+
+    monkeypatch.setattr(service.repository, "list_operations", fake_list)
+    monkeypatch.setattr(service.repository, "count_operations", fake_count)
+
+    page = await service.list_operations_page("user-a", limit=50, offset=50)
+    assert page["total"] == 130
+    assert page["hasMore"] is True
+    assert page["nextOffset"] == 100
+    assert len(page["items"]) == 50
+
+
+async def test_list_operations_page_last_page_has_no_next(monkeypatch):
+    async def fake_list(user_id, **filters):
+        return [_row("op1"), _row("op2")]
+
+    async def fake_count(user_id, **filters):
+        return 52
+
+    monkeypatch.setattr(service.repository, "list_operations", fake_list)
+    monkeypatch.setattr(service.repository, "count_operations", fake_count)
+
+    page = await service.list_operations_page("user-a", limit=50, offset=50)
+    assert page["hasMore"] is False
+    assert page["nextOffset"] is None
+
+
+async def test_create_operation_autofills_fx_from_ecb(monkeypatch):
+    captured = {}
+
+    async def fake_rate(currency, on):
+        captured["currency"] = currency
+        return {"rate": "0.9", "source": "ECB", "effectiveDate": on.isoformat()}
+
+    monkeypatch.setattr(service.fx_service, "get_rate_to_eur", fake_rate)
+    prepared = await service._resolve_fx_if_missing(
+        {
+            "currency": "USD",
+            "trade_date": date(2025, 1, 1),
+            "fx_rate_to_eur": None,
+        }
+    )
+    assert prepared["fx_rate_to_eur"] == Decimal("0.9")
+    assert prepared["fx_source"] == "ECB"
+    assert captured["currency"] == "USD"
+
+
+async def test_create_operation_fx_unavailable_raises(monkeypatch):
+    async def no_rate(currency, on):
+        return None
+
+    monkeypatch.setattr(service.fx_service, "get_rate_to_eur", no_rate)
+    with pytest.raises(AppError) as exc:
+        await service._resolve_fx_if_missing(
+            {"currency": "USD", "trade_date": date(2025, 1, 1), "fx_rate_to_eur": None}
+        )
+    assert exc.value.code == "FX_UNAVAILABLE"

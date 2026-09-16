@@ -65,6 +65,16 @@ class Settings(BaseSettings):
     # el límite del plan gratuito: ~8 req/min).
     twelve_data_poll_seconds: int = 60
 
+    # Tipos de cambio a EUR (Banco Central Europeo). El feed diario publica el
+    # cambio de referencia; se cachea en Redis para autorrellenar operaciones.
+    ecb_fx_daily_url: str = (
+        "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
+    )
+    ecb_fx_history_url: str = (
+        "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
+    )
+    ecb_fx_cache_ttl_seconds: int = 60 * 60 * 12  # 12 horas
+
     @property
     def database_url(self) -> str:
         if self.database_url_override:

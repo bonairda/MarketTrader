@@ -198,3 +198,45 @@ def test_decimal_precision_does_not_create_negative_residue():
     assert sum((d["matchedQuantity"] for d in result.disposals), Decimal("0")) == Decimal(
         "0.3"
     )
+
+
+def test_wash_sale_flagged_when_repurchase_within_two_months():
+    report = build_tax_report(
+        [
+            _op("b1", "BUY", "2025-01-01", "10", "1000"),
+            _op("s1", "SELL", "2025-02-01", "10", "800"),  # pérdida de 200
+            _op("b2", "BUY", "2025-02-20", "10", "820"),  # recompra < 2 meses
+        ],
+        2025,
+    )
+    disposal = report["disposals"][0]
+    assert disposal["gainEur"] == Decimal("-200")
+    assert disposal["washSale"] is True
+    assert report["summary"]["washSaleDisposals"] == 1
+    assert report["summary"]["washSaleAdjustmentEur"] == Decimal("200")
+
+
+def test_loss_without_repurchase_is_not_flagged():
+    report = build_tax_report(
+        [
+            _op("b1", "BUY", "2025-01-01", "10", "1000"),
+            _op("s1", "SELL", "2025-02-01", "10", "800"),
+        ],
+        2025,
+    )
+    disposal = report["disposals"][0]
+    assert disposal["gainEur"] == Decimal("-200")
+    assert disposal["washSale"] is False
+    assert report["summary"]["washSaleDisposals"] == 0
+
+
+def test_gain_is_never_flagged_as_wash_sale():
+    report = build_tax_report(
+        [
+            _op("b1", "BUY", "2025-01-01", "10", "1000"),
+            _op("s1", "SELL", "2025-02-01", "10", "1200"),  # ganancia
+            _op("b2", "BUY", "2025-02-10", "10", "1210"),  # recompra
+        ],
+        2025,
+    )
+    assert report["disposals"][0]["washSale"] is False

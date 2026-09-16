@@ -6,6 +6,7 @@ import '../core/config.dart';
 import '../models/backtest.dart';
 import '../models/dashboard.dart';
 import '../models/indicators.dart';
+import '../models/derived_portfolio.dart';
 import '../models/live_price.dart';
 import '../models/operation.dart';
 import '../models/portfolio.dart';
@@ -149,11 +150,11 @@ class MarketApi {
 
   // -------------------------- Operaciones fiscales --------------------------
 
-  Future<List<InvestmentOperation>> getOperations({
+  Future<OperationPage> getOperations({
     String? assetId,
     String? side,
     int? year,
-    int limit = 100,
+    int limit = 50,
     int offset = 0,
   }) async {
     final params = <String, String>{
@@ -166,10 +167,41 @@ class MarketApi {
     final uri = Uri.parse('$_base/operations').replace(queryParameters: params);
     final res = await _client.get(uri, headers: _headers());
     _ensureOk(res);
-    final data = jsonDecode(res.body) as List<dynamic>;
-    return data
-        .map((e) => InvestmentOperation.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return OperationPage.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  /// GET /operations/export -> devuelve el contenido (JSON o CSV) como texto.
+  Future<String> exportOperations({String format = 'json'}) async {
+    final uri = Uri.parse('$_base/operations/export')
+        .replace(queryParameters: {'format': format});
+    final res = await _client.get(uri, headers: _headers());
+    _ensureOk(res);
+    return utf8.decode(res.bodyBytes);
+  }
+
+  /// POST /operations/import -> importa operaciones (con dryRun opcional).
+  Future<ImportResult> importOperations({
+    required String content,
+    String format = 'json',
+    bool dryRun = false,
+  }) async {
+    final res = await _client.post(
+      Uri.parse('$_base/operations/import'),
+      headers: _headers(json: true),
+      body: jsonEncode({'content': content, 'format': format, 'dryRun': dryRun}),
+    );
+    _ensureOk(res);
+    return ImportResult.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  /// GET /portfolio/derived -> cartera calculada desde el libro (FIFO) en EUR.
+  Future<DerivedPortfolio> getDerivedPortfolio() async {
+    final res = await _client.get(
+      Uri.parse('$_base/portfolio/derived'),
+      headers: _headers(),
+    );
+    _ensureOk(res);
+    return DerivedPortfolio.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
 
   Future<InvestmentOperation> createOperation(NewInvestmentOperation operation) async {

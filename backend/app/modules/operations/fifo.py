@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Iterable
 
@@ -193,11 +193,56 @@ def calculate_fifo(operations: Iterable[dict]) -> FifoResult:
     return FifoResult(disposals=disposals, open_lots=open_lots)
 
 
+def _buy_dates_by_asset(operations: Iterable[dict]) -> dict[str, list[date]]:
+    buys: dict[str, list[date]] = defaultdict(list)
+    for op in operations:
+        if str(op["side"]).upper() == "BUY":
+            buys[str(op["assetId"])].append(_date(op["tradeDate"]))
+    return buys
+
+
+def _annotate_wash_sales(
+    disposals: list[dict],
+    buys_by_asset: dict[str, list[date]],
+    *,
+    window_days: int = 60,
+) -> None:
+    """Marca pérdidas potencialmente no deducibles por recompra homogénea (AEAT).
+
+    Regla orientativa: una pérdida no es computable si se adquieren valores
+    homogéneos del mismo activo dentro de una ventana alrededor de la venta
+    (±2 meses para valores cotizados). Se marca `washSale` y se explica; NO se
+    modifica la ganancia/pérdida, solo se informa.
+    """
+    window = timedelta(days=window_days)
+    for disposal in disposals:
+        disposal["washSale"] = False
+        disposal["washSaleReason"] = None
+        if disposal["gainEur"] >= ZERO:
+            continue
+        sale_date = disposal["saleDate"]
+        repurchase = any(
+            abs((buy_date - sale_date).days) <= window.days
+            and buy_date != disposal["acquisitionDate"]
+            for buy_date in buys_by_asset.get(disposal["assetId"], [])
+        )
+        if repurchase:
+            disposal["washSale"] = True
+            disposal["washSaleReason"] = (
+                "Posible recompra de valores homogéneos en ±2 meses: la pérdida "
+                "podría no ser computable este ejercicio (revisar con asesor)."
+            )
+
+
 def build_tax_report(operations: Iterable[dict], year: int) -> dict:
     """Construye un informe anual usando todo el historial hasta fin de `year`."""
+    operations = list(operations)
     relevant = [op for op in operations if _date(op["tradeDate"]).year <= year]
     fifo = calculate_fifo(relevant)
     disposals = [d for d in fifo.disposals if d["saleDate"].year == year]
+    # La recompra puede ocurrir en el ejercicio siguiente, así que se evalúa
+    # contra TODAS las compras del historial, no solo hasta fin de año.
+    _annotate_wash_sales(disposals, _buy_dates_by_asset(operations))
 
     by_asset: dict[str, dict] = {}
     for disposal in disposals:
@@ -232,6 +277,10 @@ def build_tax_report(operations: Iterable[dict], year: int) -> dict:
             ZERO,
         ),
         "realizedGainEur": sum((d["gainEur"] for d in disposals), ZERO),
+        "washSaleDisposals": sum(1 for d in disposals if d.get("washSale")),
+        "washSaleAdjustmentEur": sum(
+            (-d["gainEur"] for d in disposals if d.get("washSale")), ZERO
+        ),
     }
     return {
         "year": year,

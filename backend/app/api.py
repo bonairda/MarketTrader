@@ -6,6 +6,7 @@ from app.modules.alerts.routes import router as alerts_router
 from app.modules.auth.routes import router as auth_router
 from app.modules.backtest.routes import router as backtest_router
 from app.modules.dashboard.routes import router as dashboard_router
+from app.modules.fx.routes import router as fx_router
 from app.modules.market_data.routes import router as market_router
 from app.modules.operations.routes import router as operations_router
 from app.modules.portfolio.routes import router as portfolio_router
@@ -22,3 +23,4 @@ api_router.include_router(signals_router)
 api_router.include_router(backtest_router)
 api_router.include_router(portfolio_router)
 api_router.include_router(operations_router)
+api_router.include_router(fx_router)

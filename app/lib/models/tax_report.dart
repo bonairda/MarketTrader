@@ -6,6 +6,8 @@ class TaxSummary {
     required this.acquisitionCostEur,
     required this.feesEur,
     required this.realizedGainEur,
+    required this.washSaleDisposals,
+    required this.washSaleAdjustmentEur,
   });
 
   final int sellOperations;
@@ -14,6 +16,8 @@ class TaxSummary {
   final String acquisitionCostEur;
   final String feesEur;
   final String realizedGainEur;
+  final int washSaleDisposals;
+  final String washSaleAdjustmentEur;
 
   factory TaxSummary.fromJson(Map<String, dynamic> json) => TaxSummary(
         sellOperations: (json['sellOperations'] as num).toInt(),
@@ -22,6 +26,8 @@ class TaxSummary {
         acquisitionCostEur: json['acquisitionCostEur'].toString(),
         feesEur: json['feesEur'].toString(),
         realizedGainEur: json['realizedGainEur'].toString(),
+        washSaleDisposals: (json['washSaleDisposals'] as num?)?.toInt() ?? 0,
+        washSaleAdjustmentEur: (json['washSaleAdjustmentEur'] ?? '0.00').toString(),
       );
 }
 
@@ -63,6 +69,8 @@ class TaxDisposal {
     required this.proceedsEur,
     required this.acquisitionCostEur,
     required this.gainEur,
+    required this.washSale,
+    this.washSaleReason,
   });
 
   final String assetId;
@@ -74,6 +82,8 @@ class TaxDisposal {
   final String proceedsEur;
   final String acquisitionCostEur;
   final String gainEur;
+  final bool washSale;
+  final String? washSaleReason;
 
   factory TaxDisposal.fromJson(Map<String, dynamic> json) => TaxDisposal(
         assetId: json['assetId'].toString(),
@@ -85,6 +95,8 @@ class TaxDisposal {
         proceedsEur: json['proceedsEur'].toString(),
         acquisitionCostEur: json['acquisitionCostEur'].toString(),
         gainEur: json['gainEur'].toString(),
+        washSale: json['washSale'] as bool? ?? false,
+        washSaleReason: json['washSaleReason'] as String?,
       );
 }
 

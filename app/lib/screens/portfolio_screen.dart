@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/derived_portfolio.dart';
 import '../models/portfolio.dart';
 import '../services/market_api.dart';
 
@@ -15,6 +16,8 @@ class PortfolioScreen extends StatefulWidget {
 
 class _PortfolioScreenState extends State<PortfolioScreen> {
   Portfolio? _portfolio;
+  DerivedPortfolio? _derived;
+  bool _showDerived = true;
   bool _loading = true;
   String? _error;
 
@@ -30,12 +33,21 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       _error = null;
     });
     try {
-      final portfolio = await widget.api.getPortfolio();
-      if (!mounted) return;
-      setState(() {
-        _portfolio = portfolio;
-        _loading = false;
-      });
+      if (_showDerived) {
+        final derived = await widget.api.getDerivedPortfolio();
+        if (!mounted) return;
+        setState(() {
+          _derived = derived;
+          _loading = false;
+        });
+      } else {
+        final portfolio = await widget.api.getPortfolio();
+        if (!mounted) return;
+        setState(() {
+          _portfolio = portfolio;
+          _loading = false;
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -113,12 +125,32 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openAddPosition,
-        tooltip: 'Añadir posición',
-        child: const Icon(Icons.add),
+      floatingActionButton: _showDerived
+          ? null
+          : FloatingActionButton(
+              onPressed: _openAddPosition,
+              tooltip: 'Añadir posición',
+              child: const Icon(Icons.add),
+            ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: true, label: Text('Derivada (libro)')),
+                ButtonSegment(value: false, label: Text('Simulada')),
+              ],
+              selected: {_showDerived},
+              onSelectionChanged: (s) {
+                setState(() => _showDerived = s.first);
+                _load();
+              },
+            ),
+          ),
+          Expanded(child: _buildBody()),
+        ],
       ),
-      body: _buildBody(),
     );
   }
 
@@ -128,6 +160,9 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     }
     if (_error != null) {
       return Center(child: Text('Error: $_error'));
+    }
+    if (_showDerived) {
+      return _buildDerived(_derived!);
     }
     final portfolio = _portfolio!;
     if (portfolio.positions.isEmpty) {
@@ -145,6 +180,99 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
           ...portfolio.positions.map(
             (p) => _PositionTile(position: p, onDelete: () => _deletePosition(p)),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDerived(DerivedPortfolio portfolio) {
+    if (portfolio.positions.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'Sin posiciones abiertas en el libro de operaciones.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+    final pnl = double.tryParse(portfolio.totalPnlEur) ?? 0;
+    final pnlColor = pnl >= 0 ? Colors.green.shade700 : Colors.red.shade700;
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Resumen (EUR)',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  _kv('Coste total', '${portfolio.totalCostEur} EUR'),
+                  _kv('Valor de mercado', '${portfolio.totalValueEur} EUR'),
+                  _kv(
+                    'P&L',
+                    '${pnl >= 0 ? '+' : ''}${portfolio.totalPnlEur} EUR'
+                        '${portfolio.totalPnlPercent != null ? ' (${portfolio.totalPnlPercent}%)' : ''}',
+                    color: pnlColor,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...portfolio.positions.map((p) {
+            final positionPnl = double.tryParse(p.pnlEur ?? '');
+            return Card(
+              child: ListTile(
+                title: Text(p.assetId.toUpperCase()),
+                subtitle: Text(
+                  '${p.quantity} uds · coste medio ${p.avgCostEur} EUR\n'
+                  'Valor ${p.marketValueEur ?? '—'} EUR',
+                ),
+                isThreeLine: true,
+                trailing: Text(
+                  p.pnlEur == null
+                      ? '—'
+                      : '${positionPnl != null && positionPnl >= 0 ? '+' : ''}${p.pnlEur} EUR',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: positionPnl == null
+                        ? Colors.grey
+                        : (positionPnl >= 0
+                            ? Colors.green.shade700
+                            : Colors.red.shade700),
+                  ),
+                ),
+              ),
+            );
+          }),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              portfolio.note,
+              style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _kv(String label, String value, {Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label),
+          Text(value,
+              style: TextStyle(fontWeight: FontWeight.w600, color: color)),
         ],
       ),
     );

@@ -68,6 +68,31 @@ async def list_operations(
         return [row_to_dict(row) for row in rows]
 
 
+async def count_operations(
+    user_id: str,
+    *,
+    asset_id: str | None = None,
+    side: str | None = None,
+    year: int | None = None,
+) -> int:
+    clauses = ["user_id = :user_id"]
+    params: dict = {"user_id": user_id}
+    if asset_id:
+        clauses.append("asset_id = :asset_id")
+        params["asset_id"] = asset_id
+    if side:
+        clauses.append("side = :side")
+        params["side"] = side
+    if year:
+        clauses.append("trade_date >= :year_start AND trade_date < :year_end")
+        params["year_start"] = date(year, 1, 1)
+        params["year_end"] = date(year + 1, 1, 1)
+    query = "SELECT COUNT(*) AS n FROM operations WHERE " + " AND ".join(clauses)
+    async with SessionLocal() as session:
+        row = (await session.execute(text(query), params)).first()
+        return int(row.n) if row else 0
+
+
 async def get_operation(user_id: str, operation_id: str) -> dict | None:
     async with SessionLocal() as session:
         row = (
