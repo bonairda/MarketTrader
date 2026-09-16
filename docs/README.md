@@ -20,6 +20,7 @@ escrito en Markdown y puede consultarse online (GitHub Pages) o exportarse a PDF
 | 02 | [Guía de configuración](02-guia-de-configuracion.md) | Desarrolladores, operadores | Todas las variables de entorno, secretos, seguridad, integraciones opcionales |
 | 03 | [Guía de despliegue](03-guia-de-despliegue.md) | DevOps, operadores | Local con Docker, CI/CD, Coolify + Oracle Cloud, backups, operación y rollback |
 | 04 | [Manual de usuario](04-manual-de-usuario.md) | Usuario final | Cómo usar cada pantalla y función de la aplicación |
+| 05 | [Trading con dinero real](05-trading-real.md) | Desarrolladores, operadores | Hoja de ruta para pasar de paper a dinero real: fases, seguridad, límites y conciliación |
 
 > Consejo: si es la primera vez que tocas el proyecto, lee los documentos en orden
 > (01 → 02 → 03). Si solo vas a **usar** la aplicación, ve directo al

@@ -225,10 +225,37 @@ ALLOW_REGISTRATION=false
 
 Marca como **secretos**: `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `JWT_SECRET`,
 `TWELVE_DATA_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`,
+`TELEGRAM_WEBHOOK_SECRET`, `SUPERADMIN_PASSWORD`,
 `RCLONE_CONFIG_OCI_ACCESS_KEY_ID`, `RCLONE_CONFIG_OCI_SECRET_ACCESS_KEY`.
 
+Opcionales recomendados en producción:
+
+```
+# Superadministrador (se crea/actualiza al arrancar; contraseña >= 12 caracteres)
+SUPERADMIN_EMAIL=admin@tu-dominio.com
+SUPERADMIN_PASSWORD=<secreto fuerte, min 12>
+
+# Telegram por usuario (bot único del sistema) + webhook
+TELEGRAM_BOT_TOKEN=<token de @BotFather>
+TELEGRAM_WEBHOOK_SECRET=<secreto aleatorio>
+```
+
 > Recuerda: el backend permite crear el **primer** usuario aunque
-> `ALLOW_REGISTRATION=false`. Créalo de inmediato para cerrar el alta.
+> `ALLOW_REGISTRATION=false`. Si además configuras `SUPERADMIN_EMAIL`/
+> `SUPERADMIN_PASSWORD`, ese superadministrador se crea automáticamente al
+> arrancar y puede dar de alta al resto desde el panel de administración.
+
+### 3.6.1 Registrar el webhook de Telegram (si usas notificaciones)
+
+Para que el bot reciba los `/start <código>` de vinculación, registra el webhook
+una vez (con `TELEGRAM_BOT_TOKEN` ya configurado y la API publicada):
+
+```bash
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://api.market.<dominio>/notifications/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>"
+```
+
+Sin `TELEGRAM_BOT_TOKEN` la vinculación por usuario queda deshabilitada y las
+alertas solo se registran en el log. El watchdog usa `TELEGRAM_CHAT_ID` (global).
 
 ### 3.7 Acceso a GHCR
 
@@ -310,6 +337,12 @@ alembic current
 
 Registra el primer usuario propietario y confirma que `ALLOW_REGISTRATION=false`
 sigue aplicado.
+
+Si configuraste el superadministrador, comprueba en el log de la API el mensaje
+`[BOOTSTRAP] Superadmin garantizado: <email>` e inicia sesión con
+`SUPERADMIN_EMAIL`/`SUPERADMIN_PASSWORD`: deberías ver el panel de administración
+(icono de administración en la pantalla Mercado) para crear usuarios y asignar
+roles.
 
 ## 5. Backups
 
@@ -395,7 +428,8 @@ No uses `alembic downgrade` automático.
   de una exposición amplia).
 - El token web se guarda en almacenamiento accesible por JavaScript: mantén CSP y
   evita XSS.
-- Telegram es global, no por usuario.
+- Las notificaciones de Telegram ya son **por usuario** (cada uno vincula su
+  chat); el watchdog sigue usando el chat global de administración.
 - Los informes fiscales son un borrador informativo, no asesoramiento.
 - La instancia única no ofrece alta disponibilidad regional.
 

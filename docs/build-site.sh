@@ -23,6 +23,7 @@ DOCS=(
   "02-guia-de-configuracion:Guía de configuración"
   "03-guia-de-despliegue:Guía de despliegue"
   "04-manual-de-usuario:Manual de usuario"
+  "05-trading-real:Trading con dinero real"
 )
 
 # ---- CSS comun del sitio (claro, legible, imprimible) ----
@@ -133,6 +134,47 @@ echo "  -> completo.html"
 
 echo "== Copiando la landing (index.html) =="
 cp "$DOCS_DIR/index.html" "$OUT_DIR/index.html"
+
+echo "== Generando 404.html =="
+cat > "$OUT_DIR/404.html" <<'HTML'
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Página no encontrada — MarketTracker</title>
+<style>
+  body { font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:#0b1220; color:#e6edf7; margin:0; min-height:100vh;
+    display:flex; align-items:center; justify-content:center; text-align:center; padding:24px; }
+  .box { max-width:520px; }
+  h1 { font-size:2.4rem; margin:.2em 0; }
+  p { color:#9fb0c9; }
+  a { display:inline-block; margin-top:16px; background:#2563eb; color:#fff;
+    padding:10px 20px; border-radius:8px; text-decoration:none; font-weight:600; }
+  a:hover { background:#3b82f6; }
+  ul { list-style:none; padding:0; margin-top:20px; }
+  li { margin:6px 0; }
+  li a { background:transparent; color:#60a5fa; padding:0; font-weight:400; margin:0; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>404</h1>
+  <p>No encontramos esa página. Puede que el sitio se esté actualizando; inténtalo
+     de nuevo en un momento o vuelve al inicio.</p>
+  <a href="./">Ir al inicio de la documentación</a>
+  <ul>
+    <li><a href="01-guia-del-proyecto.html">Guía del proyecto</a></li>
+    <li><a href="02-guia-de-configuracion.html">Guía de configuración</a></li>
+    <li><a href="03-guia-de-despliegue.html">Guía de despliegue</a></li>
+    <li><a href="04-manual-de-usuario.html">Manual de usuario</a></li>
+    <li><a href="05-trading-real.html">Trading con dinero real</a></li>
+  </ul>
+</div>
+</body>
+</html>
+HTML
 
 if [ "$have_pandoc" = "1" ] && [ "$have_pdf" = "1" ]; then
   echo "== Generando PDF con pandoc + wkhtmltopdf =="
