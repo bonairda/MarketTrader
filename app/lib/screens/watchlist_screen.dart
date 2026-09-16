@@ -229,7 +229,9 @@ class _AddSymbolDialogState extends State<_AddSymbolDialog> {
   }
 
   void _submit() {
-    final value = _controller.text.trim().toLowerCase();
+    // El backend normaliza el formato (cripto en minúsculas, acciones/forex en
+    // mayúsculas), así que aquí solo recortamos espacios.
+    final value = _controller.text.trim();
     if (value.isEmpty) return;
     Navigator.of(context).pop(value);
   }
@@ -238,15 +240,25 @@ class _AddSymbolDialogState extends State<_AddSymbolDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Añadir símbolo'),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        textInputAction: TextInputAction.done,
-        onSubmitted: (_) => _submit(),
-        decoration: const InputDecoration(
-          labelText: 'Símbolo',
-          hintText: 'p. ej. btcusdt',
-        ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _submit(),
+            decoration: const InputDecoration(
+              labelText: 'Símbolo',
+              hintText: 'btcusdt · stock:AAPL · fx:EUR/USD',
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Cripto: btcusdt · Acciones: stock:AAPL · Forex: fx:EUR/USD',
+            style: TextStyle(fontSize: 11),
+          ),
+        ],
       ),
       actions: [
         TextButton(

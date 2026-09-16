@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     # el worker avisa por Telegram de que la ingestión puede estar caída.
     ingestion_stale_seconds: int = 120
 
+    # Twelve Data (acciones y forex). Plan gratuito: sin WebSocket, se hace
+    # polling REST. Si no hay clave, el proveedor no se activa.
+    twelve_data_api_key: str = ""
+    # Cada cuántos segundos se consulta el precio de acciones/forex (respetando
+    # el límite del plan gratuito: ~8 req/min).
+    twelve_data_poll_seconds: int = 60
+
     @property
     def database_url(self) -> str:
         return (

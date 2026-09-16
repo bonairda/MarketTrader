@@ -100,7 +100,11 @@ Pendiente futuro (no bloquea F1):
       (`market_data/indicators.py`), calculados bajo demanda vía `GET /market/indicators/{symbol}`
       (`indicators_service.py`). Con tests de valores conocidos y casos borde.
       La app los muestra en el detalle del activo (panel con RSI y su estado, medias, MACD, ATR, Bollinger).
-- [ ] Adaptador de acciones/forex (Twelve Data o Polygon), aceptando retraso ~15 min.
+- [x] **Adaptador de acciones/forex** (Twelve Data, plan free -> polling REST, retraso ~15 min).
+      Enrutado por prefijo (`providers/symbols.py`): cripto `btcusdt`, acciones `stock:AAPL`,
+      forex `fx:EUR/USD`. El worker agrupa por proveedor y lanza un stream por cada uno
+      (Binance en vivo + Twelve Data por polling) a la vez. Backfill usa el proveedor correcto.
+      Requiere `TWELVE_DATA_API_KEY` en `.env`.
 - [ ] Dashboard de inicio (estado global, top movers, mapa de calor).
 - [ ] Más tipos de alerta (%, volatilidad, volumen, cruce de indicador).
 

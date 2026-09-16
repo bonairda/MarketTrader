@@ -27,7 +27,11 @@ from app.modules.market_data.aggregator import BarAggregator
 from app.modules.notifications import dispatcher
 from app.modules.watchlists import repository as watchlist_repo
 from app.modules.watchlists.events import WATCHLIST_CHANGED_CHANNEL
+from app.providers import symbols as symbol_utils
+from app.providers.base import MarketDataProvider
 from app.providers.binance import BinanceProvider
+from app.providers.symbols import ProviderKind
+from app.providers.twelve_data import TwelveDataProvider
 
 setup_logging()
 log = get_logger("worker")
@@ -73,18 +77,28 @@ async def _resolve_symbols() -> list[str]:
 
 
 async def _ingest(
-    provider: BinanceProvider,
+    provider: MarketDataProvider,
     symbols: list[str],
     aggregator: BarAggregator,
     alert_engine: AlertEngine,
     monitor: IngestionMonitor,
 ) -> None:
-    log.info("[INGESTION] Iniciando ingestión para: %s", symbols)
+    log.info("[INGESTION] Iniciando ingestión (%s) para: %s", type(provider).__name__, symbols)
     async for tick in provider.stream_ticks(symbols):
         monitor.mark_tick()
         await live.set_live_price(tick.symbol, tick.price, tick.timestamp_ms)
         await aggregator.on_tick(tick.symbol, tick.price, tick.timestamp_ms)
         await alert_engine.on_tick(tick.symbol, tick.price)
+
+
+def _providers_for(grouped: dict[ProviderKind, list[str]]) -> list[tuple[MarketDataProvider, list[str]]]:
+    """Empareja cada proveedor con sus símbolos, según el enrutado por prefijo."""
+    pairs: list[tuple[MarketDataProvider, list[str]]] = []
+    if ProviderKind.CRYPTO in grouped:
+        pairs.append((BinanceProvider(), grouped[ProviderKind.CRYPTO]))
+    if ProviderKind.TWELVE_DATA in grouped:
+        pairs.append((TwelveDataProvider(), grouped[ProviderKind.TWELVE_DATA]))
+    return pairs
 
 
 async def _maintenance(
@@ -121,7 +135,6 @@ async def _watch_watchlist(changed: asyncio.Event) -> None:
 async def run() -> None:
     aggregator = BarAggregator()
     alert_engine = AlertEngine()
-    provider = BinanceProvider()
     monitor = IngestionMonitor()
 
     await alert_engine.refresh_rules()
@@ -131,29 +144,36 @@ async def run() -> None:
     watchlist_task = asyncio.create_task(_watch_watchlist(changed))
 
     try:
-        # Bucle supervisor: (re)lanza la ingestión con los símbolos actuales y la
-        # reinicia cuando la watchlist cambia.
+        # Bucle supervisor: agrupa los símbolos por proveedor (cripto vía Binance,
+        # acciones/forex vía Twelve Data), lanza un stream por proveedor y los
+        # reinicia todos cuando la watchlist cambia.
         while True:
             symbols = await _resolve_symbols()
-            ingest_task = asyncio.create_task(
-                _ingest(provider, symbols, aggregator, alert_engine, monitor)
-            )
+            grouped = symbol_utils.group_by_provider(symbols)
+
+            ingest_tasks = [
+                asyncio.create_task(
+                    _ingest(provider, provider_symbols, aggregator, alert_engine, monitor)
+                )
+                for provider, provider_symbols in _providers_for(grouped)
+            ]
             changed_wait = asyncio.create_task(changed.wait())
 
-            done, _pending = await asyncio.wait(
-                {ingest_task, changed_wait},
+            await asyncio.wait(
+                {*ingest_tasks, changed_wait},
                 return_when=asyncio.FIRST_COMPLETED,
             )
 
-            # Cancela la ingestión actual antes de resuscribir (o al salir).
-            ingest_task.cancel()
+            # Cancela todos los streams antes de resuscribir (o al salir).
+            for task in ingest_tasks:
+                task.cancel()
             changed_wait.cancel()
 
             if changed.is_set():
                 changed.clear()
                 log.info("[INGESTION] Resuscribiendo a la nueva watchlist")
                 continue
-            # Si la ingestión terminó por sí sola (caso raro), reintenta.
+            # Si un stream terminó por sí solo (caso raro), reintenta.
             await asyncio.sleep(1)
     finally:
         maintenance_task.cancel()
