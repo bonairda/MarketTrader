@@ -1,7 +1,7 @@
 # Estado del proyecto — MarketTracker
 
 > Documento de contexto para retomar el proyecto en cualquier momento.
-> Última actualización: F6 completa (operaciones, auditoría e informe fiscal FIFO).
+> Última actualización: despliegue Oracle Cloud + Coolify preparado (GitOps, backups y HTTPS).
 
 ## 1. Resumen
 
@@ -38,6 +38,10 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
   - `worker` (ingestión, 512 MB)
 - Healthchecks y `restart: unless-stopped`.
 - `.env.example` con configuración por variables de entorno.
+- **Producción Oracle/Coolify**: `compose.production.yml` con redes privadas,
+  imágenes GHCR multiarch, Flutter+Nginx runtime-config, migración one-shot,
+  healthchecks, backups/restore y despliegue condicionado por CI. Runbook en
+  `deploy/COOLIFY_ORACLE_RUNBOOK.md`.
 
 ### Backend (Python / FastAPI)
 - **core/**: configuración (`config.py`), logging, cliente Redis, y `db.py`

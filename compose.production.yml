@@ -1,0 +1,231 @@
+# Stack de producción para Coolify. Los dominios se asignan desde la UI:
+#   app -> puerto 8080 | api -> puerto 8000
+# DB, Redis, worker, migrate y backup NO deben tener dominio ni puerto público.
+
+x-backend-environment: &backend-environment
+  POSTGRES_HOST: db
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER es obligatorio}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}
+  POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB es obligatorio}
+  DATABASE_URL: ${DATABASE_URL:-}
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD es obligatorio}
+  REDIS_URL: ${REDIS_URL:-}
+  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET es obligatorio}
+  JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-10080}
+  ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
+  CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS es obligatorio}
+  ENVIRONMENT: production
+  DOCS_ENABLED: ${DOCS_ENABLED:-false}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  CRYPTO_WS_URL: ${CRYPTO_WS_URL:-wss://stream.binance.com:9443/ws}
+  DEFAULT_CRYPTO_SYMBOLS: ${DEFAULT_CRYPTO_SYMBOLS:-btcusdt,ethusdt}
+  TWELVE_DATA_API_KEY: ${TWELVE_DATA_API_KEY:-}
+  TWELVE_DATA_POLL_SECONDS: ${TWELVE_DATA_POLL_SECONDS:-60}
+  TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+  TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+  INGESTION_STALE_SECONDS: ${INGESTION_STALE_SECONDS:-120}
+  WORKER_HEARTBEAT_TTL_SECONDS: ${WORKER_HEARTBEAT_TTL_SECONDS:-30}
+
+services:
+  db:
+    image: ${TIMESCALE_IMAGE:-timescale/timescaledb}:${TIMESCALE_TAG:-2.16.1-pg16}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER es obligatorio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB es obligatorio}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - max_connections=50
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    stop_grace_period: 60s
+    mem_limit: 2g
+    networks:
+      - backend
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7.4-alpine}
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --requirepass
+      - ${REDIS_PASSWORD}
+      - --maxmemory
+      - 512mb
+      - --maxmemory-policy
+      - allkeys-lru
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$$REDIS_PASSWORD redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD es obligatorio}
+    mem_limit: 640m
+    networks:
+      - backend
+
+  migrate:
+    image: ${BACKEND_IMAGE:-ghcr.io/bonairda/markettrader-backend}:${IMAGE_TAG:-main}
+    pull_policy: always
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    environment: *backend-environment
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
+  api:
+    image: ${BACKEND_IMAGE:-ghcr.io/bonairda/markettrader-backend}:${IMAGE_TAG:-main}
+    pull_policy: always
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --proxy-headers
+      - --forwarded-allow-ips=*
+    restart: unless-stopped
+    environment: *backend-environment
+    expose:
+      - "8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+    mem_limit: 640m
+    networks:
+      - backend
+      - coolify
+
+  worker:
+    image: ${BACKEND_IMAGE:-ghcr.io/bonairda/markettrader-backend}:${IMAGE_TAG:-main}
+    pull_policy: always
+    command: ["python", "-m", "app.worker"]
+    restart: unless-stopped
+    environment: *backend-environment
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.worker_healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    stop_grace_period: 45s
+    mem_limit: 768m
+    networks:
+      - backend
+      - egress
+
+  app:
+    image: ${APP_IMAGE:-ghcr.io/bonairda/markettrader-web}:${IMAGE_TAG:-main}
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:?PUBLIC_API_BASE_URL es obligatorio}
+      REQUIRE_HTTPS: "true"
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    mem_limit: 160m
+    networks:
+      - coolify
+
+  backup:
+    build:
+      context: ./deploy/backup
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER es obligatorio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB es obligatorio}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_ON_START: ${BACKUP_ON_START:-false}
+      RCLONE_REMOTE: ${RCLONE_REMOTE:-}
+      RCLONE_DESTINATION: ${RCLONE_DESTINATION:-}
+      RCLONE_CONFIG_OCI_TYPE: ${RCLONE_CONFIG_OCI_TYPE:-s3}
+      RCLONE_CONFIG_OCI_PROVIDER: ${RCLONE_CONFIG_OCI_PROVIDER:-Other}
+      RCLONE_CONFIG_OCI_ACCESS_KEY_ID: ${RCLONE_CONFIG_OCI_ACCESS_KEY_ID:-}
+      RCLONE_CONFIG_OCI_SECRET_ACCESS_KEY: ${RCLONE_CONFIG_OCI_SECRET_ACCESS_KEY:-}
+      RCLONE_CONFIG_OCI_ENDPOINT: ${RCLONE_CONFIG_OCI_ENDPOINT:-}
+      RCLONE_CONFIG_OCI_REGION: ${RCLONE_CONFIG_OCI_REGION:-}
+    volumes:
+      - backupdata:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 384m
+    networks:
+      - backend
+      - egress
+
+volumes:
+  pgdata:
+    name: ${STACK_NAME:-market-tracker}-pgdata
+  redisdata:
+    name: ${STACK_NAME:-market-tracker}-redisdata
+  backupdata:
+    name: ${STACK_NAME:-market-tracker}-backups
+
+networks:
+  backend:
+    name: ${STACK_NAME:-market-tracker}-backend
+    internal: true
+  egress:
+    name: ${STACK_NAME:-market-tracker}-egress
+  coolify:
+    external: true
+    name: ${COOLIFY_NETWORK:-coolify}

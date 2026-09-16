@@ -16,6 +16,7 @@ from app.modules.market_data.broadcaster import broadcaster
 
 setup_logging()
 log = get_logger("main")
+settings.assert_safe_for_production()
 
 
 @asynccontextmanager
@@ -28,12 +29,19 @@ async def lifespan(app: FastAPI):
     await close_redis()
 
 
-app = FastAPI(title="MarketTracker API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="MarketTracker API",
+    version="0.1.0",
+    lifespan=lifespan,
+    docs_url="/docs" if settings.docs_enabled else None,
+    redoc_url="/redoc" if settings.docs_enabled else None,
+    openapi_url="/openapi.json" if settings.docs_enabled else None,
+)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
-    allow_credentials=True,
+    allow_credentials="*" not in settings.cors_origin_list,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -46,5 +54,13 @@ app.include_router(api_router)
 async def health() -> JSONResponse:
     """Salud del servicio y sus dependencias. 503 si alguna dependencia falla."""
     report = await health_report()
+    status_code = 200 if report["status"] == "ok" else 503
+    return JSONResponse(status_code=status_code, content=report)
+
+
+@app.get("/health/system", tags=["health"])
+async def system_health() -> JSONResponse:
+    """Salud integral: API, DB, Redis y heartbeat del worker."""
+    report = await health_report(include_worker=True)
     status_code = 200 if report["status"] == "ok" else 503
     return JSONResponse(status_code=status_code, content=report)

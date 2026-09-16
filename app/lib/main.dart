@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import 'core/config.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
 import 'services/market_api.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AppConfig.initialize();
   runApp(const MarketTrackerApp());
 }
 

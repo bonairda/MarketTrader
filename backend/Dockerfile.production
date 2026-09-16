@@ -1,0 +1,27 @@
+FROM python:3.12.7-slim-bookworm
+
+ARG APP_REVISION=unknown
+ENV APP_REVISION=${APP_REVISION} \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PATH=/home/markettracker/.local/bin:${PATH}
+
+WORKDIR /code
+
+RUN groupadd --system markettracker \
+    && useradd --system --gid markettracker --create-home markettracker
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app ./app
+COPY alembic.ini ./
+COPY alembic ./alembic
+
+RUN chown -R markettracker:markettracker /code
+USER markettracker
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]

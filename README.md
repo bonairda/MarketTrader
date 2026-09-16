@@ -19,7 +19,9 @@ market-tracker/
 │   │   └── worker.py   # entrypoint worker de ingestión
 │   ├── requirements.txt
 │   └── Dockerfile
-├── docker-compose.yml  # api + worker + postgres(timescale) + redis, con límites de RAM
+├── docker-compose.yml       # desarrollo local
+├── compose.production.yml   # Oracle/Coolify (servicios privados + app web)
+├── deploy/                  # backup, restore, smoke test y runbook operativo
 └── .env.example
 ```
 
@@ -34,6 +36,18 @@ market-tracker/
    docker compose up --build
    ```
 3. API en http://localhost:8000 — documentación en http://localhost:8000/docs
+
+## Despliegue Oracle Cloud + Coolify
+
+El proyecto incluye stack de producción, frontend web Nginx, imágenes multiarch,
+backups y despliegue GitHub Actions → GHCR → Coolify. Sigue el runbook completo:
+
+```text
+deploy/COOLIFY_ORACLE_RUNBOOK.md
+```
+
+Plantilla de variables: `.env.production.example`. No contiene ni debe contener
+secretos reales.
 
 ## Servicios
 

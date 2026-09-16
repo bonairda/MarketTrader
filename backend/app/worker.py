@@ -21,6 +21,7 @@ import time
 from app.core.config import settings
 from app.core.logging import get_logger, setup_logging
 from app.core.redis_client import close_redis, get_redis
+from app.core.worker_health import write_worker_heartbeat
 from app.modules.alerts.engine import AlertEngine
 from app.modules.market_data import live
 from app.modules.market_data.aggregator import BarAggregator
@@ -117,6 +118,7 @@ async def _maintenance(
     seconds_since_hotmarkets = 0
     while True:
         await asyncio.sleep(_MAINTENANCE_INTERVAL_SECONDS)
+        await write_worker_heartbeat()
         await aggregator.flush_stale()
         await alert_engine.evaluate_candle_based()
         await monitor.check()
@@ -151,6 +153,7 @@ async def run() -> None:
     alert_engine = AlertEngine()
     monitor = IngestionMonitor()
 
+    await write_worker_heartbeat()
     await alert_engine.refresh_rules()
 
     changed = asyncio.Event()
@@ -173,10 +176,19 @@ async def run() -> None:
             ]
             changed_wait = asyncio.create_task(changed.wait())
 
-            await asyncio.wait(
-                {*ingest_tasks, changed_wait},
+            done, _ = await asyncio.wait(
+                {*ingest_tasks, changed_wait, maintenance_task, watchlist_task},
                 return_when=asyncio.FIRST_COMPLETED,
             )
+
+            # Un fallo de mantenimiento/heartbeat o de pubsub debe terminar el
+            # proceso; restart: unless-stopped podrá recuperarlo.
+            if maintenance_task in done:
+                await maintenance_task
+                raise RuntimeError("La tarea de mantenimiento terminó inesperadamente")
+            if watchlist_task in done:
+                await watchlist_task
+                raise RuntimeError("La vigilancia de watchlist terminó inesperadamente")
 
             # Cancela todos los streams antes de resuscribir (o al salir).
             for task in ingest_tasks:

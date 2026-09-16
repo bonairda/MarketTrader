@@ -1,0 +1,130 @@
+name: Publish and Deploy Coolify
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: market-tracker-production
+  cancel-in-progress: false
+
+jobs:
+  publish-deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      TIMESCALE_IMAGE: ${{ vars.TIMESCALE_IMAGE || 'timescale/timescaledb' }}
+      TIMESCALE_TAG: ${{ vars.TIMESCALE_TAG || '2.16.1-pg16' }}
+    steps:
+      - name: Resolve revision
+        id: revision
+        shell: bash
+        run: |
+          sha="${{ github.event.workflow_run.head_sha }}"
+          current=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main | cut -f1)
+          test "$sha" = "$current" || {
+            echo "El SHA validado ya no es la punta de main; no se despliega" >&2
+            exit 1
+          }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.revision.outputs.sha }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Verify TimescaleDB ARM64 manifest
+        shell: bash
+        run: |
+          docker buildx imagetools inspect "$TIMESCALE_IMAGE:$TIMESCALE_TAG" \
+            | grep -q 'linux/arm64'
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend multi-arch
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile.production
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            APP_REVISION=${{ steps.revision.outputs.sha }}
+          tags: |
+            ghcr.io/${{ steps.revision.outputs.owner }}/markettrader-backend:main
+            ghcr.io/${{ steps.revision.outputs.owner }}/markettrader-backend:sha-${{ steps.revision.outputs.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.revision.outputs.sha }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.2'
+          channel: stable
+          cache: true
+
+      - name: Build Flutter web
+        working-directory: app
+        run: |
+          flutter create --platforms=web .
+          flutter pub get
+          flutter build web --release --dart-define=REQUIRE_RUNTIME_CONFIG=true
+
+      - name: Build and push web multi-arch
+        uses: docker/build-push-action@v6
+        with:
+          context: app
+          file: app/Dockerfile.web
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            APP_REVISION=${{ steps.revision.outputs.sha }}
+          tags: |
+            ghcr.io/${{ steps.revision.outputs.owner }}/markettrader-web:main
+            ghcr.io/${{ steps.revision.outputs.owner }}/markettrader-web:sha-${{ steps.revision.outputs.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.revision.outputs.sha }}
+
+      - name: Trigger Coolify deployment
+        env:
+          COOLIFY_DEPLOY_WEBHOOK: ${{ secrets.COOLIFY_DEPLOY_WEBHOOK }}
+        run: |
+          test -n "$COOLIFY_DEPLOY_WEBHOOK" || {
+            echo "Falta el secret COOLIFY_DEPLOY_WEBHOOK" >&2
+            exit 1
+          }
+          curl --fail --silent --show-error --retry 3 "$COOLIFY_DEPLOY_WEBHOOK"
+
+      - name: Wait and smoke test
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          API_URL: ${{ vars.API_URL }}
+          SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+          EXPECTED_REVISION: ${{ steps.revision.outputs.sha }}
+        run: |
+          test -n "$APP_URL" -a -n "$API_URL" || {
+            echo "Faltan las variables APP_URL/API_URL" >&2
+            exit 1
+          }
+          bash deploy/smoke.sh

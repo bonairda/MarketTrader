@@ -1,22 +1,68 @@
-/// Configuración de la app.
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+
+/// Configuración pública de la app.
 ///
-/// La URL base de la API se puede sobrescribir en tiempo de compilación con:
-///   flutter run --dart-define=API_BASE_URL=http://192.168.1.50:8000
+/// En web, Nginx genera `/config.json` al arrancar a partir de
+/// `PUBLIC_API_BASE_URL`. En móvil/escritorio se mantiene `--dart-define`.
 class AppConfig {
-  /// URL base del backend. Por defecto localhost para desarrollo web/escritorio.
-  /// En un emulador Android usa http://10.0.2.2:8000
-  static const String apiBaseUrl = String.fromEnvironment(
+  static const String _compiledApiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'http://localhost:8000',
   );
 
-  /// Intervalo de refresco de reserva por si el WebSocket no está disponible.
+  static const bool _requireRuntimeConfig = bool.fromEnvironment(
+    'REQUIRE_RUNTIME_CONFIG',
+    defaultValue: false,
+  );
+
+  static String _apiBaseUrl = _compiledApiBaseUrl;
+
+  /// Debe ejecutarse antes de runApp. En builds de producción
+  /// REQUIRE_RUNTIME_CONFIG obliga a fallar en vez de apuntar a localhost.
+  static Future<void> initialize() async {
+    if (!kIsWeb) return;
+    try {
+      final uri = Uri.base.resolve(
+        'config.json?v=${DateTime.now().millisecondsSinceEpoch}',
+      );
+      final response = await http.get(uri, headers: {'Cache-Control': 'no-cache'});
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw StateError('No se pudo cargar config.json (${response.statusCode})');
+      }
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      final candidate = (payload['apiBaseUrl'] as String?)?.trim() ?? '';
+      final parsed = Uri.tryParse(candidate);
+      if (parsed == null || !parsed.hasAuthority) {
+        throw const FormatException('apiBaseUrl no es una URL absoluta');
+      }
+      if (parsed.scheme != 'http' && parsed.scheme != 'https') {
+        throw const FormatException('apiBaseUrl debe usar HTTP o HTTPS');
+      }
+      _apiBaseUrl = candidate.replaceFirst(RegExp(r'/+$'), '');
+    } catch (_) {
+      if (_requireRuntimeConfig) rethrow;
+      // En desarrollo se conserva el fallback compilado.
+    }
+  }
+
+  static String get apiBaseUrl => _apiBaseUrl;
+
+  /// Intervalo de refresco de respaldo si el WebSocket no está disponible.
   static const Duration livePollInterval = Duration(seconds: 5);
 
-  /// URL del WebSocket de precios en vivo, derivada de la URL base
-  /// (http -> ws, https -> wss).
   static String get liveWsUrl {
-    final base = apiBaseUrl.replaceFirst('http', 'ws');
-    return '$base/market/ws';
+    final api = Uri.parse(apiBaseUrl);
+    final basePath = api.path.replaceFirst(RegExp(r'/+$'), '');
+    return api
+        .replace(
+          scheme: api.scheme == 'https' ? 'wss' : 'ws',
+          path: '$basePath/market/ws',
+          query: null,
+          fragment: null,
+        )
+        .toString();
   }
 }
