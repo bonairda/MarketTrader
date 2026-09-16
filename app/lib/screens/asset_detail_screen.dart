@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/backtest.dart';
 import '../models/indicators.dart';
 import '../models/price_bar.dart';
 import '../models/signal.dart';
@@ -105,12 +106,42 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
     }
   }
 
+  Future<void> _runBacktest() async {
+    // Diálogo de carga mientras se ejecuta el backtest.
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      final result =
+          await widget.api.getBacktest(widget.symbol, interval: _interval);
+      if (!mounted) return;
+      Navigator.of(context).pop(); // cierra el loader
+      await showDialog<void>(
+        context: context,
+        builder: (_) => _BacktestDialog(result: result, interval: _interval),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop(); // cierra el loader
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error en el backtest: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.symbol.toUpperCase()),
         actions: [
+          IconButton(
+            onPressed: _runBacktest,
+            icon: const Icon(Icons.analytics),
+            tooltip: 'Backtest de la estrategia',
+          ),
           IconButton(
             onPressed: _openCreateAlert,
             icon: const Icon(Icons.add_alert),
@@ -268,6 +299,74 @@ class _SignalPanel extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Diálogo con las métricas del backtest de la estrategia de señales.
+class _BacktestDialog extends StatelessWidget {
+  const _BacktestDialog({required this.result, required this.interval});
+
+  final BacktestResult result;
+  final String interval;
+
+  String _pct(double v) => '${v >= 0 ? '+' : ''}${v.toStringAsFixed(2)}%';
+
+  @override
+  Widget build(BuildContext context) {
+    final returnColor = result.totalReturnPct >= 0
+        ? Colors.green.shade700
+        : Colors.red.shade700;
+    final rows = <(String, String, Color?)>[
+      ('Operaciones', '${result.trades}', null),
+      ('Aciertos', '${result.winRate.toStringAsFixed(1)}%', null),
+      ('Retorno total', _pct(result.totalReturnPct), returnColor),
+      ('Retorno medio/op.', _pct(result.avgReturnPct), null),
+      ('Máx. drawdown', '-${result.maxDrawdownPct.toStringAsFixed(2)}%',
+          Colors.red.shade700),
+      ('Velas analizadas', '${result.candles}', null),
+    ];
+
+    return AlertDialog(
+      title: Text('Backtest · ${result.symbol.toUpperCase()} ($interval)'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ...rows.map(
+            (r) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(r.$1),
+                  Text(
+                    r.$2,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: r.$3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(top: 12),
+            child: Text(
+              'Resultado histórico simulado (sin comisiones ni slippage). '
+              'No garantiza rendimientos futuros ni es asesoramiento.',
+              style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cerrar'),
+        ),
+      ],
     );
   }
 }

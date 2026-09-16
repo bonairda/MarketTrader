@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../services/market_api.dart';
 import 'dashboard_screen.dart';
+import 'portfolio_screen.dart';
 import 'watchlist_screen.dart';
 
-/// Contenedor principal con navegación inferior entre Dashboard y Watchlist.
+/// Contenedor principal con navegación inferior entre Dashboard, Watchlist y Cartera.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.api});
 
@@ -27,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
         body: DashboardScreen(api: widget.api),
       ),
       WatchlistScreen(api: widget.api),
+      PortfolioScreen(api: widget.api),
     ];
 
     return Scaffold(
@@ -37,6 +39,8 @@ class _HomeScreenState extends State<HomeScreen> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.dashboard), label: 'Mercado'),
           NavigationDestination(icon: Icon(Icons.star), label: 'Watchlist'),
+          NavigationDestination(
+              icon: Icon(Icons.account_balance_wallet), label: 'Cartera'),
         ],
       ),
     );

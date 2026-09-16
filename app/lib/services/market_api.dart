@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../core/config.dart';
+import '../models/backtest.dart';
 import '../models/dashboard.dart';
 import '../models/indicators.dart';
 import '../models/live_price.dart';
+import '../models/portfolio.dart';
 import '../models/price_bar.dart';
 import '../models/signal.dart';
 
@@ -63,6 +65,52 @@ class MarketApi {
     final res = await _client.get(uri);
     _ensureOk(res);
     return TradingSignal.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  /// GET /backtest/{symbol} -> métricas de la estrategia sobre velas históricas.
+  Future<BacktestResult> getBacktest(
+    String symbol, {
+    String interval = '1m',
+    int limit = 1000,
+  }) async {
+    final uri = Uri.parse(
+      '$_base/backtest/$symbol?interval=$interval&limit=$limit',
+    );
+    final res = await _client.get(uri);
+    _ensureOk(res);
+    return BacktestResult.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  /// GET /portfolio -> posiciones valoradas + resumen P&L.
+  Future<Portfolio> getPortfolio() async {
+    final res = await _client.get(Uri.parse('$_base/portfolio'));
+    _ensureOk(res);
+    return Portfolio.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  /// POST /portfolio/positions -> añade una posición.
+  Future<void> addPosition({
+    required String assetId,
+    required double quantity,
+    required double averagePrice,
+  }) async {
+    final res = await _client.post(
+      Uri.parse('$_base/portfolio/positions'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'assetId': assetId,
+        'quantity': quantity,
+        'averagePrice': averagePrice,
+      }),
+    );
+    _ensureOk(res);
+  }
+
+  /// DELETE /portfolio/positions/{id} -> borra una posición.
+  Future<void> deletePosition(String id) async {
+    final res =
+        await _client.delete(Uri.parse('$_base/portfolio/positions/$id'));
+    _ensureOk(res);
   }
 
   /// GET /dashboard -> resumen del mercado seguido.

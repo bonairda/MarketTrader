@@ -76,3 +76,17 @@ class AlertRule(Base):
     last_triggered_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+
+class Position(Base):
+    """Posición de cartera simulada (introducida manualmente por el usuario)."""
+
+    __tablename__ = "positions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    asset_id: Mapped[str] = mapped_column(String, nullable=False)
+    quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    average_price: Mapped[float] = mapped_column(Float, nullable=False)
+    opened_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

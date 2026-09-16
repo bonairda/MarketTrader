@@ -1,7 +1,7 @@
 # Estado del proyecto — MarketTracker
 
 > Documento de contexto para retomar el proyecto en cualquier momento.
-> Última actualización: fase F0/F1 inicial (esqueleto de backend).
+> Última actualización: F4 completa (backtesting + cartera simulada).
 
 ## 1. Resumen
 
@@ -23,7 +23,7 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 | F1 | MVP: cripto en vivo + watchlist + velas + alertas + app | Completa |
 | F2 | Acciones/forex, indicadores, dashboard, tipos de alerta | Completa |
 | F3 | Señales, riesgo, mercados llamativos | Completa |
-| F4 | Backtesting, cartera/simulación | Pendiente |
+| F4 | Backtesting, cartera/simulación | Completa |
 | F5 | Multiusuario, roles, producto comercial | Pendiente |
 
 ## 3. Apartados implementados
@@ -70,6 +70,9 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 - `GET /market/indicators/{symbol}?interval=1m&limit=500` — indicadores técnicos (F2)
 - `GET /dashboard?fresh=false` — resumen del mercado seguido (F2)
 - `GET /signals/{symbol}?interval=1m` — señal + riesgo del activo (F3)
+- `GET /backtest/{symbol}?interval=1m&limit=1000` — métricas de la estrategia sobre velas (F4)
+- `GET /portfolio` — posiciones valoradas con precio en vivo + resumen P&L (F4)
+- `POST /portfolio/positions` · `DELETE /portfolio/positions/{id}` — CRUD de posiciones (F4)
 - `WS  /market/ws` — stream de precios en vivo (Redis pub/sub -> WebSocket)
 - `GET /watchlist` · `POST /watchlist` · `DELETE /watchlist/{asset_id}`
 - `GET /alerts` · `POST /alerts` · `PUT /alerts/{id}/enabled` · `DELETE /alerts/{id}`
@@ -126,10 +129,30 @@ Pendiente futuro (no bloquea F1):
       evaluados periódicamente en el worker y notificados por los canales configurados
       (con cooldown por símbolo+motivo).
 
-### F4 / F5
-- [ ] Backtesting y evaluación de señales.
-- [ ] Cartera/posiciones (manual/simulado).
+### F4 — COMPLETA
+- [x] **Motor de backtesting** puro y sin lookahead (`backtest/engine.py`): recorre las velas
+      en orden y en cada paso evalúa la misma estrategia de señales usando SOLO los datos
+      disponibles hasta ese momento. Estrategia long-only (entra en BUY, sale en SELL, cierra
+      al final). Warmup de 50 velas para los indicadores lentos. Métricas: nº de operaciones,
+      win rate, retorno total compuesto, retorno medio por operación y máximo drawdown de la
+      curva de equity. Sin comisiones ni slippage (documentado como mejora futura).
+- [x] **Endpoint** `GET /backtest/{symbol}` (`backtest/service.py` + `routes.py`) que ejecuta
+      el backtest sobre las velas almacenadas.
+- [x] **Cartera simulada (manual)**: modelo `Position` (`core/models.py`) + migración
+      `0003_positions`. Repositorio CRUD (`portfolio/repository.py`), valoración pura
+      (`portfolio/valuation.py`: valor de mercado, coste, P&L absoluto y %) y servicio que
+      valora cada posición con el precio en vivo (`portfolio/service.py`). Endpoints
+      `GET /portfolio`, `POST /portfolio/positions`, `DELETE /portfolio/positions/{id}`.
+- [x] **Tests**: backtesting (`tests/test_backtest.py`: return_pct, warmup insuficiente,
+      compuesto, win rate, drawdown, integridad de una serie larga) y valoración de cartera
+      (`tests/test_portfolio_valuation.py`: ganancia/pérdida/sin precio y totales del resumen).
+- [x] **App Flutter**: botón de backtest en el detalle del activo (diálogo con las métricas
+      y aviso de que es un resultado simulado, no asesoramiento) y nueva pestaña **Cartera**
+      (lista de posiciones valoradas con P&L, resumen global y alta/baja de posiciones).
+
+### F5 — PENDIENTE
 - [ ] Autenticación (JWT), roles (OWNER/ANALYST/VIEWER), multiusuario.
+- [ ] Producto comercial.
 
 ## 5. Consolidación de la base (Bloques A, B y C — hechos)
 
