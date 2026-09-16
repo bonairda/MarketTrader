@@ -1,0 +1,56 @@
+name: Docs (GitHub Pages)
+
+# Publica la documentacion de docs/ como sitio de GitHub Pages y genera los PDF
+# con pandoc. Un solo punto de acceso: https://<owner>.github.io/<repo>/
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un solo despliegue de Pages a la vez; no cancela el que este en curso.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Construir el sitio y los PDF
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar pandoc y wkhtmltopdf
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pandoc wkhtmltopdf fonts-dejavu
+          pandoc --version
+          wkhtmltopdf --version || true
+
+      - name: Construir el sitio (HTML + PDF)
+        run: bash docs/build-site.sh _site
+
+      - name: Subir artefacto de Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Desplegar en GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Desplegar
+        id: deployment
+        uses: actions/deploy-pages@v4

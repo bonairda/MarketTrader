@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Documentación de MarketTracker — PDF</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1f2933; max-width: 760px; margin: 0 auto; padding: 48px 28px; }
+  h1 { color: #10243e; border-bottom: 3px solid #2563eb; padding-bottom: .3em; }
+  a { color: #2563eb; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .card { border: 1px solid #d0d7de; border-radius: 10px; padding: 20px 22px; margin: 20px 0; }
+  .card h2 { margin-top: 0; font-size: 1.15em; }
+  .btn { display: inline-block; background: #2563eb; color: #fff; padding: 10px 18px; border-radius: 6px; font-weight: 600; margin-top: 8px; }
+  .btn:hover { background: #1d4ed8; text-decoration: none; }
+  .muted { color: #52606d; font-size: .92em; }
+  code { background: #f1f5f9; padding: .12em .35em; border-radius: 4px; font-family: Consolas, monospace; }
+</style>
+</head>
+<body>
+<h1>Documentación de MarketTracker — exportar a PDF</h1>
+
+<div class="card">
+  <h2>Documento completo (recomendado)</h2>
+  <p class="muted">Un único fichero con las cuatro guías, listo para imprimir a PDF.</p>
+  <a class="btn" href="MarketTracker-Documentacion.html">Abrir documento completo</a>
+  <p class="muted">Ábrelo y pulsa el botón "Imprimir / Guardar como PDF" (o <code>Ctrl+P</code>). Elige tamaño A4.</p>
+</div>
+
+<div class="card">
+  <h2>¿Prefieres regenerar los HTML por documento?</h2>
+  <p class="muted">Desde la raíz del proyecto:</p>
+  <ul class="muted">
+    <li><strong>Windows:</strong> doble clic en <code>docs\build-pdf.bat</code></li>
+    <li><strong>Linux/macOS:</strong> <code>bash docs/build-pdf.sh</code></li>
+  </ul>
+  <p class="muted">Los scripts no requieren instalar nada; el navegador hace la exportación a PDF.</p>
+</div>
+
+<p class="muted">Los documentos originales en Markdown están en la carpeta <code>docs/</code>.</p>
+</body>
+</html>

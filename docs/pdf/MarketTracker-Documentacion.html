@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Documentación de MarketTracker</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55; color: #1f2933; max-width: 860px; margin: 0 auto;
+    padding: 32px 28px; font-size: 15px;
+  }
+  h1, h2, h3, h4 { color: #10243e; line-height: 1.25; margin-top: 1.6em; }
+  h1 { font-size: 1.9em; border-bottom: 3px solid #2563eb; padding-bottom: .25em; }
+  h2 { font-size: 1.45em; border-bottom: 1px solid #d0d7de; padding-bottom: .2em; }
+  h3 { font-size: 1.2em; }
+  code {
+    background: #f1f5f9; padding: .12em .35em; border-radius: 4px;
+    font-family: "Cascadia Code", Consolas, "Courier New", monospace; font-size: .88em;
+  }
+  pre {
+    background: #0f172a; color: #e2e8f0; padding: 14px 16px; border-radius: 8px;
+    overflow-x: auto; font-size: .84em; line-height: 1.45;
+  }
+  pre code { background: transparent; color: inherit; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: .92em; }
+  th, td { border: 1px solid #d0d7de; padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: #eff6ff; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  blockquote {
+    margin: 1em 0; padding: .5em 1em; border-left: 4px solid #2563eb;
+    background: #f0f7ff; color: #334155; border-radius: 0 6px 6px 0;
+  }
+  a { color: #2563eb; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  hr { border: none; border-top: 1px solid #d0d7de; margin: 2em 0; }
+  ul, ol { padding-left: 1.4em; }
+  .toolbar {
+    position: sticky; top: 0; background: #10243e; color: #fff; margin: -32px -28px 24px;
+    padding: 14px 28px; display: flex; align-items: center; gap: 16px; z-index: 10;
+  }
+  .toolbar strong { font-size: 1.05em; }
+  .toolbar button {
+    background: #2563eb; color: #fff; border: none; padding: 8px 16px; border-radius: 6px;
+    cursor: pointer; font-size: .9em; font-weight: 600;
+  }
+  .toolbar button:hover { background: #1d4ed8; }
+  .toolbar .hint { font-size: .82em; opacity: .85; }
+  .doc { page-break-after: always; }
+  .doc:last-child { page-break-after: auto; }
+  @media print {
+    body { max-width: none; padding: 0; font-size: 11pt; }
+    .toolbar { display: none; }
+    a { color: #1f2933; }
+    pre { white-space: pre-wrap; word-wrap: break-word; }
+    h1, h2, h3 { page-break-after: avoid; }
+    table, pre, blockquote { page-break-inside: avoid; }
+    thead { display: table-header-group; }
+  }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <strong>Documentación de MarketTracker</strong>
+  <button onclick="window.print()">Imprimir / Guardar como PDF</button>
+  <span class="hint">Pulsa el botón (o Ctrl+P) y elige "Guardar como PDF". Tamaño A4.</span>
+</div>
+<div id="content"></div>
+
+<!-- Documentos embebidos como Markdown (el navegador no los interpreta como HTML). -->
+<script type="text/markdown" id="doc-readme">
+# Documentación de MarketTracker
+
+Bienvenido a la documentación completa de **MarketTracker**, una herramienta de
+seguimiento y análisis de mercados financieros (cripto, forex y acciones) formada
+por un backend Python/FastAPI y una app Flutter multiplataforma.
+
+Esta carpeta reúne todas las guías y manuales del proyecto.
+
+## Índice de documentos
+
+| # | Documento | Para quién | Contenido |
+|---|-----------|------------|-----------|
+| 01 | Guía del proyecto | Desarrolladores, arquitectos | Qué es, arquitectura, componentes, flujo de datos, módulos, modelo de datos |
+| 02 | Guía de configuración | Desarrolladores, operadores | Todas las variables de entorno, secretos, seguridad, integraciones opcionales |
+| 03 | Guía de despliegue | DevOps, operadores | Local con Docker, CI/CD, Coolify + Oracle Cloud, backups, operación y rollback |
+| 04 | Manual de usuario | Usuario final | Cómo usar cada pantalla y función de la aplicación |
+
+> Consejo: si es la primera vez que tocas el proyecto, lee los documentos en orden
+> (01, 02, 03). Si solo vas a **usar** la aplicación, ve directo al Manual de usuario.
+
+## Mapa rápido del repositorio
+
+```
+market-tracker/
+  app/            # App Flutter (web / escritorio / móvil)
+  backend/        # API FastAPI + worker de ingestión + migraciones Alembic
+  deploy/         # Scripts de despliegue, backups y runbook de Coolify/Oracle
+  docs/           # ESTA carpeta: guías y manuales
+  docker-compose.yml         # Stack de desarrollo local
+  compose.production.yml     # Stack de producción (Coolify)
+  .env.example               # Plantilla de variables para desarrollo
+  .env.production.example    # Plantilla de variables para producción
+```
+
+> Este fichero reúne los cuatro documentos en uno solo para imprimirlo cómodamente
+> a PDF. También tienes cada documento por separado en formato Markdown en la
+> carpeta `docs/`, y puedes regenerar HTML por documento con `docs/build-pdf.bat`
+> (Windows) o `docs/build-pdf.sh` (Linux/macOS).
+
+</script>
+
+<script type="text/markdown" id="doc-01">
+# Guía del proyecto — MarketTracker
+
+Documento de referencia para desarrolladores y arquitectos. Describe qué es
+MarketTracker, cómo está construido, cómo fluyen los datos y qué hace cada
+componente.
+
+## 1. ¿Qué es MarketTracker?
+
+MarketTracker es una herramienta personal de **seguimiento y análisis de mercados
+financieros**. Permite vigilar precios en vivo de criptomonedas, forex y acciones,
+generar alertas, analizar señales técnicas, hacer backtesting, llevar un libro de
+operaciones con informes fiscales (FIFO, en euros) y operar en modo simulado
+(paper trading) sin dinero real.
+
+El sistema está pensado para autohospedaje: un único despliegue sirve a uno o
+varios usuarios con autenticación propia, y consume proveedores de datos
+públicos o de plan gratuito (Binance para cripto, Twelve Data para acciones/forex,
+Banco Central Europeo para tipos de cambio).
+
+### Capacidades principales
+
+- **Precios en vivo** vía WebSocket, con respaldo por polling REST.
+- **Velas históricas** (1m, 5m, 1h, 1d) y gráfico de velas nativo.
+- **Watchlists** por usuario: la lista de activos que quieres seguir.
+- **Alertas** por cruce de precio, cambio porcentual o cruce de indicadores.
+- **Señales** técnicas explicables (votos ponderados de compra/venta).
+- **Backtesting** de estrategias sin lookahead.
+- **Cartera**: posiciones valoradas con precio en vivo y cartera derivada FIFO en EUR.
+- **Operaciones**: libro fiscal con importación/exportación e informes anuales.
+- **Eventos corporativos**: dividendos (con retención) y splits.
+- **Paper trading** con Alpaca (opt-in, siempre contra el entorno de paper).
+- **Notificaciones** opcionales por Telegram.
+
+## 2. Arquitectura general
+
+MarketTracker es un **mono-repo** con dos artefactos desplegables (backend y app)
+apoyados en dos almacenes de datos (TimescaleDB y Redis).
+
+```
+   App Flutter (web)  --- Nginx sirve el build; config.json en runtime
+        |  HTTPS/WSS (REST + WebSocket)
+        v
+   Backend (Python)
+     - API FastAPI (uvicorn): REST + WebSocket
+     - Worker de ingestion (python -m app.worker): streams + agregacion
+        |                         |
+        v                         v
+   TimescaleDB               Redis
+   velas cerradas,           precio en vivo, vela en curso,
+   usuarios, etc.            pub/sub, cache, heartbeat
+        ^                         ^
+        |    ingestion desde proveedores: Binance (WS),
+        |    Twelve Data (REST), BCE (FX)
+```
+
+### Componentes desplegables (servicios)
+
+| Servicio | Comando | Rol | Puerto |
+|----------|---------|-----|--------|
+| api | `uvicorn app.main:app` | API REST + WebSocket, documentación OpenAPI | 8000 |
+| worker | `python -m app.worker` | Ingesta de precios, agrega velas, evalúa alertas, watchdog | — |
+| db | TimescaleDB (PostgreSQL) | Persistencia de velas cerradas y datos de usuario | 5432 |
+| redis | Redis 7 | Precio en vivo, vela en curso, pub/sub, caché, heartbeat | 6379 |
+| migrate | `alembic upgrade head` | Aplica el esquema y termina (efímero) | — |
+| app | Nginx + build web | Sirve la app Flutter compilada a web | 8080 |
+| backup | Script + rclone | Copias periódicas de la base de datos (solo producción) | — |
+
+api y worker dependen de que db y redis estén sanos y de que migrate haya
+terminado correctamente.
+
+## 3. Principios de diseño clave
+
+### 3.1 Los ticks no se persisten
+
+Los ticks (cada precio puntual recibido de un proveedor) **nunca se guardan en la
+base de datos**. Viven en Redis como el último precio conocido
+(`live:price:<symbol>`) y la vela en construcción del minuto actual. A la base de
+datos solo se escriben **velas cerradas** (OHLCV de 1 minuto), y de ahí se derivan
+agregaciones a 5m/1h/1d. Redis es la fuente de la verdad para "lo que pasa ahora".
+
+### 3.2 Una sola ingestión para todos los usuarios
+
+El worker no ingesta por usuario. Resuelve el universo de símbolos como la **unión
+de todas las watchlists** (y usa `DEFAULT_CRYPTO_SYMBOLS` si no hay ninguna). Una
+única suscripción sirve a todos. Cuando alguien añade o quita un activo, se publica
+un evento en un canal Redis y el worker **resuscribe en caliente** sin reiniciar.
+
+### 3.3 Enrutado por proveedor
+
+Cada símbolo se enruta a su proveedor según su prefijo/tipo: **cripto** a
+`BinanceProvider` (WebSocket público, gratis) y **acciones/forex** a
+`TwelveDataProvider` (polling REST, porque el plan gratuito no ofrece WebSocket).
+
+### 3.4 Concurrencia con asyncio (sin Celery)
+
+Todo el procesamiento en segundo plano es asyncio dentro de un único proceso
+worker. No hay Celery ni scheduler externo: la periodicidad la gestiona el propio
+bucle de mantenimiento del worker. La API usa BackgroundTasks y el lifespan de
+FastAPI para tareas puntuales.
+
+### 3.5 Una imagen web para todos los entornos
+
+La app Flutter web se compila una sola vez. La URL de la API no se compila: Nginx
+la inyecta en runtime en `/config.json` a partir de `PUBLIC_API_BASE_URL`. La misma
+imagen sirve para desarrollo, staging y producción.
+
+### 3.6 Arranque seguro en producción
+
+Al iniciar, el backend llama a `assert_safe_for_production()`. Con
+`ENVIRONMENT=production` impide arrancar con configuración insegura: JWT_SECRET
+débil, CORS_ORIGINS vacío, con comodín o sin HTTPS, o contraseñas débiles de
+PostgreSQL/Redis.
+
+## 4. El backend en detalle
+
+Framework: **FastAPI** sobre **uvicorn**, con **Pydantic 2** y **pydantic-settings**.
+Acceso a datos con **SQLAlchemy 2 async** + **asyncpg**, migraciones con **Alembic**.
+Autenticación con **PyJWT** + **bcrypt**. Requiere **Python 3.12+**. Calidad: ruff
+(lint), black (formato), pytest + fakeredis (tests).
+
+### 4.1 Puntos de entrada
+
+- `app/main.py`: crea la aplicación FastAPI. En su lifespan arranca/detiene el
+  broadcaster (única suscripción a `live:ticks` por proceso API) y cierra Redis.
+  Ejecuta la validación de producción, configura CORS, registra manejadores de
+  error e incluye el router raíz. Expone `GET /health` (DB + Redis) y
+  `GET /health/system` (además el heartbeat del worker); devuelven 503 si algo falla.
+- `app/api.py`: el `api_router` que agrupa los routers de los 12 módulos.
+- `app/worker.py`: el worker de ingestión (ver sección 6).
+
+### 4.2 Núcleo (app/core/)
+
+| Archivo | Responsabilidad |
+|---------|-----------------|
+| config.py | Settings de pydantic-settings; lee .env. Propiedades derivadas y validación de producción. |
+| db.py | Engine async de SQLAlchemy, SessionLocal, get_session(). |
+| redis_client.py | Singleton perezoso get_redis() y close_redis(). |
+| security.py | hash/verify de contraseña (bcrypt), creación/decodificación de JWT (HS256). |
+| health.py | Comprobación de DB (SELECT 1), Redis (ping) e informe de salud. |
+| worker_health.py | Escritura y comprobación del heartbeat del worker. |
+| errors.py, logging.py, models.py | Errores, logging estructurado y modelos comunes. |
+
+### 4.3 Proveedores de datos (app/providers/)
+
+| Archivo | Rol |
+|---------|-----|
+| base.py | Interfaz MarketDataProvider (contrato stream_ticks). |
+| binance.py | BinanceProvider: WebSocket público de Binance para cripto. |
+| twelve_data.py | TwelveDataProvider: polling REST para acciones y forex. |
+| symbols.py | ProviderKind, group_by_provider, normalize_asset_id; enrutado por prefijo. |
+
+## 5. Módulos de negocio (app/modules/)
+
+Cada módulo agrupa rutas, lógica (service/engine) y acceso a datos (repository).
+Todos los endpoints, salvo login y registro, requieren un JWT Bearer.
+
+| Módulo | Prefijo | Qué hace |
+|--------|---------|----------|
+| auth | /auth | Registro, login y validación de sesión. |
+| market_data | /market | Precios en vivo, velas, indicadores y WebSocket. |
+| watchlists | /watchlist | Gestión de la lista de activos seguidos. |
+| alerts | /alerts | Reglas de alerta por cruce. |
+| dashboard | /dashboard | Resumen agregado de la watchlist. |
+| signals | /signals | Señales técnicas explicables. |
+| backtest | /backtest | Backtesting de estrategias. |
+| portfolio | /portfolio | Cartera y cartera derivada FIFO. |
+| operations | (sin prefijo) | Libro de operaciones e informes fiscales. |
+| corporate | /corporate-events | Dividendos (con retención) y splits. |
+| fx | /fx | Tipos de cambio a EUR (feeds del BCE). |
+| paper_trading | /paper-trading | Operativa simulada con Alpaca (opt-in). |
+| notifications | — | Envío a canales configurados (Telegram/FCM). |
+
+### Detalles de la lógica por módulo
+
+- **alerts**: motor por cruce (no por nivel). Tipos: PRICE_CROSS, PERCENT_CHANGE,
+  INDICATOR_CROSS. El worker recarga las reglas y las evalúa por tick y por vela.
+- **signals**: señal explicable con votos ponderados de compra/venta y riesgo bajo
+  demanda. Los "mercados llamativos" se evalúan con cooldown por símbolo y motivo.
+- **backtest**: backtesting sin lookahead; en el MVP sin comisiones ni slippage.
+- **portfolio**: valora posiciones con el precio en vivo y calcula la cartera
+  derivada aplicando FIFO en euros a partir de las operaciones.
+- **operations**: libro transaccional con informes fiscales FIFO,
+  importación/exportación (CSV genérico e importadores por broker) y auditoría.
+- **corporate**: dividendos con retención y splits, con conversión FX y resumen fiscal.
+- **fx**: tipos de cambio a EUR desde los feeds del BCE (diario e histórico 90 días),
+  con caché en Redis (12 h) y fallback al último día hábil.
+- **dashboard**: agrega el estado de la watchlist (contadores, top movers, más
+  volátiles), cacheado en Redis.
+
+## 6. El worker de ingestión
+
+El worker (app/worker.py) es un único proceso asyncio con un bucle supervisor y
+varias tareas concurrentes:
+
+1. **resolver símbolos**: unión de watchlists (o símbolos por defecto), agrupados
+   por proveedor.
+2. **ingesta** (una por proveedor): por cada tick actualiza el precio en vivo en
+   Redis, alimenta el agregador de velas y evalúa las alertas por precio.
+3. **mantenimiento** (cada 5 s): escribe el heartbeat, cierra velas vencidas,
+   evalúa alertas por velas/indicadores y ejecuta el watchdog. Cada 30 s recarga
+   las reglas de alerta y evalúa los mercados llamativos.
+4. **vigilancia de watchlist**: escucha el canal Redis de cambios y dispara la
+   resuscripción en caliente.
+
+El watchdog registra cuándo llegó el último tick; si pasan INGESTION_STALE_SECONDS
+sin datos, avisa por notificaciones (si están configuradas). Al apagar, el worker
+persiste las velas en construcción. Su salud se comprueba con
+`python -m app.worker_healthcheck`.
+
+## 7. La app Flutter
+
+Paquete market_tracker (v0.1.0). SDK Dart 3.4+; Flutter 3.35.2 en CI. Dependencias:
+http, intl, web_socket_channel, shared_preferences. Una sola base de código para
+web, escritorio y móvil.
+
+### 7.1 Arranque y sesión
+
+main.dart inicializa la configuración antes de arrancar, crea MarketApi y
+AuthService, y usa un gate de sesión que decide la pantalla inicial: splash
+mientras valida el token, login sin sesión y home con sesión válida. Ante un 401
+hace logout y vuelve al login.
+
+### 7.2 Configuración (lib/core/config.dart)
+
+- **Web**: carga `/config.json` en runtime (lo genera Nginx desde
+  PUBLIC_API_BASE_URL) y valida que la URL sea absoluta http/https.
+- **Móvil/escritorio**: usa `--dart-define=API_BASE_URL` (por defecto
+  http://localhost:8000).
+- REQUIRE_RUNTIME_CONFIG=true fuerza fallo si no puede cargar la config.
+- Deriva la URL del WebSocket y usa un polling REST de 5 s como respaldo.
+
+### 7.3 Servicios (lib/services/)
+
+- **market_api.dart**: cliente HTTP que añade Authorization Bearer salvo en
+  login/registro y traduce los 401 a excepción de no autorizado.
+- **auth_service.dart**: login/registro/logout, persiste token y email, valida la
+  sesión con /auth/me.
+- **live_stream.dart**: WebSocket a /market/ws, stream de precios en vivo,
+  reconexión automática y recarga tras altas/bajas de la watchlist.
+
+### 7.4 Pantallas (lib/screens/)
+
+| Pantalla | Función |
+|----------|---------|
+| login_screen | Inicio de sesión y registro. |
+| home_screen | Navegación entre mercado, watchlist, cartera y operaciones. |
+| dashboard_screen | Resumen: contadores, top movers, más volátiles. |
+| watchlist_screen | Precios en vivo de los activos seguidos. |
+| asset_detail_screen | Gráfico de velas con selector de intervalo (1m/5m/1h/1d). |
+| portfolio_screen | Posiciones valoradas y P&L. |
+| operations_screen | Libro fiscal de compras/ventas (FIFO). |
+| tax_report_screen | Informe fiscal anual FIFO; CSV al portapapeles. |
+| corporate_events_screen | Dividendos y splits. |
+| paper_trading_screen | Órdenes simuladas con Alpaca. |
+
+El gráfico de velas es propio (CustomPainter), sin librerías externas.
+
+## 8. Modelo de datos (migraciones Alembic)
+
+| Revisión | Cambios |
+|----------|---------|
+| 0001_initial_schema | assets, price_bars (hypertable de Timescale), watchlist_items, alert_rules. |
+| 0002_alert_types | Añade indicator y timeframe a alert_rules. |
+| 0003_positions | Tabla positions (cartera simulada). |
+| 0004_users_and_ownership | Tabla users y user_id en watchlist_items, alert_rules y positions. |
+| 0005_operations | operations (libro fiscal) y operation_audit_log. |
+| 0006_corporate_events | corporate_events (dividendos con retención y splits). |
+
+La tabla price_bars es una hypertable de TimescaleDB y solo contiene velas cerradas.
+
+## 9. Flujo de datos de extremo a extremo
+
+1. El worker se suscribe a la unión de watchlists y recibe ticks de Binance
+   (cripto) y Twelve Data (acciones/forex).
+2. Por cada tick: actualiza el precio en vivo en Redis, alimenta la vela de 1m en
+   construcción y evalúa alertas de precio. Publica el tick en `live:ticks`.
+3. Al cerrarse un minuto, la vela se persiste en price_bars (TimescaleDB).
+4. La API mantiene una única suscripción a `live:ticks` (el broadcaster) y reparte
+   los precios a los clientes por WebSocket, filtrando por la watchlist de cada usuario.
+5. La app muestra precios en vivo (WebSocket, con respaldo REST) y consume el resto
+   de módulos por REST.
+6. El watchdog vigila que sigan llegando ticks y avisa por Telegram si se detiene.
+
+## 10. Pila tecnológica (resumen)
+
+| Capa | Tecnología |
+|------|------------|
+| App | Flutter / Dart 3.4+, servida como web tras Nginx |
+| API | FastAPI + uvicorn (Python 3.12) |
+| Ingestión | Worker asyncio propio |
+| ORM / migraciones | SQLAlchemy 2 async + asyncpg + Alembic |
+| Base de datos | TimescaleDB (PostgreSQL 16) |
+| Caché / tiempo real | Redis 7 |
+| Auth | JWT (PyJWT, HS256) + bcrypt |
+| Proveedores | Binance (WS), Twelve Data (REST), BCE (FX), Alpaca (paper) |
+| Notificaciones | Telegram (opcional), FCM |
+| CI/CD | GitHub Actions a GHCR a Coolify (Oracle Cloud) |
+| Contenedores | Docker / Docker Compose |
+
+</script>
+
+<script type="text/markdown" id="doc-02">
+# Guía de configuración — MarketTracker
+
+Referencia completa de todas las variables de entorno del backend y de la app,
+con recomendaciones de seguridad e integraciones opcionales.
+
+## 1. De dónde sale la configuración
+
+- **Backend**: todas las opciones se definen en `backend/app/core/config.py`
+  (clase Settings, basada en pydantic-settings). Se leen de variables de entorno y,
+  en desarrollo, del fichero `.env`. Si una variable no está definida, se usa el
+  valor por defecto de config.py.
+- **App Flutter**: en web la configuración pública llega en runtime a través de
+  `/config.json` (lo genera Nginx desde PUBLIC_API_BASE_URL); en móvil/escritorio
+  se pasa con `--dart-define`.
+
+Plantillas incluidas: `.env.example` (desarrollo, cópiala a `.env`) y
+`.env.production.example` (producción/Coolify, sin secretos reales).
+
+```
+cp .env.example .env
+```
+
+> `.env` no debe subirse al repositorio (contiene secretos).
+
+## 2. Variables del backend
+
+### 2.1 Base de datos (TimescaleDB / PostgreSQL)
+
+| Variable | Por defecto | Descripción |
+|----------|-------------|-------------|
+| POSTGRES_USER | market | Usuario de la base de datos. |
+| POSTGRES_PASSWORD | market | Contraseña. Cámbiala en producción. |
+| POSTGRES_DB | markettracker | Nombre de la base de datos. |
+| POSTGRES_HOST | db | Host (nombre del servicio en Docker). |
+| POSTGRES_PORT | 5432 | Puerto. |
+| DATABASE_URL | — | URL completa alternativa; tiene prioridad si se define. Formato: postgresql+asyncpg://usuario:password@host:5432/basededatos |
+
+### 2.2 Redis
+
+| Variable | Por defecto | Descripción |
+|----------|-------------|-------------|
+| REDIS_HOST | redis | Host de Redis. |
+| REDIS_PORT | 6379 | Puerto. |
+| REDIS_PASSWORD | (vacío) | Contraseña. Vacío = sin autenticación (solo dev). |
+| REDIS_URL | — | URL completa alternativa; tiene prioridad si se define. |
+
+### 2.3 API y entorno
+
+| Variable | Por defecto | Descripción |
+|----------|-------------|-------------|
+| ENVIRONMENT | local | local, test, staging o production. En production se activan las validaciones. |
+| API_HOST | 0.0.0.0 | Interfaz de escucha. |
+| API_PORT | 8000 | Puerto de la API. |
+| APP_REVISION | unknown | Revisión/commit desplegado. |
+| DOCS_ENABLED | true | Publica /docs, /redoc y /openapi.json. Ponlo a false en producción. |
+| LOG_LEVEL | INFO | Nivel de logging. |
+| CORS_ORIGINS | (comodín) | Orígenes permitidos, separados por coma. En producción debe ser lista https explícita. |
+
+### 2.4 Autenticación (JWT)
+
+| Variable | Por defecto | Descripción |
+|----------|-------------|-------------|
+| JWT_SECRET | change-me-in-production | Secreto de firma. Debe tener 32+ caracteres aleatorios en producción. |
+| JWT_ALGORITHM | HS256 | Algoritmo de firma. |
+| JWT_EXPIRE_MINUTES | 10080 (7 días) | Caducidad del token. |
+| ALLOW_REGISTRATION | true | Permite el registro abierto. El primer usuario siempre puede registrarse aunque esté en false. |
+
+### 2.5 Ingestión de mercado
+
+| Variable | Por defecto | Descripción |
+|----------|-------------|-------------|
+| CRYPTO_WS_URL | wss://stream.binance.com:9443/ws | WebSocket público de Binance. |
+| DEFAULT_CRYPTO_SYMBOLS | btcusdt,ethusdt | Símbolos por defecto si las watchlists están vacías. |
+| INGESTION_STALE_SECONDS | 120 | Segundos sin ticks antes de que avise el watchdog. |
+| WORKER_HEARTBEAT_TTL_SECONDS | 30 | TTL del heartbeat que Docker/Coolify usa para comprobar el worker. |
+
+### 2.6 Twelve Data (acciones y forex) — opcional
+
+| Variable | Por defecto | Descripción |
+|----------|-------------|-------------|
+| TWELVE_DATA_API_KEY | (vacío) | Clave del plan gratuito. Sin ella, solo se ingiere cripto. |
+| TWELVE_DATA_POLL_SECONDS | 60 | Cada cuántos segundos se consulta el precio (plan free ~8 req/min). |
+
+### 2.7 Tipos de cambio (Banco Central Europeo)
+
+| Variable | Por defecto | Descripción |
+|----------|-------------|-------------|
+| ECB_FX_DAILY_URL | feed diario del BCE | Cambio de referencia diario a EUR. |
+| ECB_FX_HISTORY_URL | feed 90 días del BCE | Feed histórico de 90 días. |
+| ECB_FX_CACHE_TTL_SECONDS | 43200 (12 h) | TTL de la caché de tipos en Redis. |
+
+### 2.8 Notificaciones (Telegram) — opcional
+
+| Variable | Por defecto | Descripción |
+|----------|-------------|-------------|
+| TELEGRAM_BOT_TOKEN | (vacío) | Token del bot creado con BotFather. |
+| TELEGRAM_CHAT_ID | (vacío) | ID del chat o grupo destino. |
+
+Si ambos se dejan vacíos, las alertas y avisos solo se registran en el log.
+
+### 2.9 Paper trading (Alpaca) — opcional
+
+| Variable | Por defecto | Descripción |
+|----------|-------------|-------------|
+| ALPACA_ENABLED | false | Activa la integración de paper trading. |
+| ALPACA_API_KEY | (vacío) | Clave de API de Alpaca. |
+| ALPACA_API_SECRET | (vacío) | Secreto de API de Alpaca. |
+| ALPACA_BASE_URL | https://paper-api.alpaca.markets | Host de paper por defecto. Nunca uses el host real. |
+
+## 3. Variables de despliegue (producción / Coolify)
+
+| Variable | Ejemplo | Descripción |
+|----------|---------|-------------|
+| STACK_NAME | market-tracker-production | Prefijo de volúmenes y redes. |
+| COOLIFY_NETWORK | coolify | Nombre de la red externa de Coolify. |
+| BACKEND_IMAGE | ghcr.io/.../markettrader-backend | Imagen del backend en GHCR. |
+| APP_IMAGE | ghcr.io/.../markettrader-web | Imagen de la app web en GHCR. |
+| IMAGE_TAG | main o sha-<commit> | Tag desplegado (main = auto-deploy; sha- para rollback). |
+| TIMESCALE_IMAGE / TIMESCALE_TAG | timescale/timescaledb / 2.16.1-pg16 | Imagen base de la BD. |
+| REDIS_IMAGE | redis:7.4-alpine | Imagen base de Redis. |
+| PUBLIC_API_BASE_URL | https://api.market.example.com | URL pública de la API (la app la lee en runtime). |
+| BACKUP_INTERVAL_SECONDS | 86400 | Frecuencia del backup automático. |
+| BACKUP_RETENTION_DAYS | 30 | Días de retención de backups. |
+| BACKUP_ON_START | false | Hacer un backup al arrancar. |
+| RCLONE_* | — | Copia off-host opcional a S3/OCI. |
+
+## 4. Configuración de la app Flutter
+
+### 4.1 Web (runtime)
+
+| Variable | Descripción |
+|----------|-------------|
+| PUBLIC_API_BASE_URL | Obligatoria. URL absoluta de la API. |
+| REQUIRE_HTTPS | Si es true, rechaza URLs http:// (recomendado en producción). |
+
+El build web se compila con REQUIRE_RUNTIME_CONFIG=true, que obliga a que exista
+config.json válido y evita apuntar a localhost por error.
+
+### 4.2 Móvil / escritorio (compilación)
+
+| Define | Descripción |
+|--------|-------------|
+| API_BASE_URL | URL de la API (por defecto http://localhost:8000). |
+| REQUIRE_RUNTIME_CONFIG | En builds no-web se deja en false. |
+
+```
+# Emulador Android (el host de la máquina es 10.0.2.2)
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
+
+# Dispositivo físico en la red local
+flutter run --dart-define=API_BASE_URL=http://192.168.1.50:8000
+```
+
+## 5. Recomendaciones de seguridad
+
+El backend ejecuta `assert_safe_for_production()` al arrancar. Con
+ENVIRONMENT=production el arranque falla si no se cumple:
+
+- JWT_SECRET con al menos 32 caracteres y que no sea el placeholder por defecto.
+- CORS_ORIGINS no vacío, sin comodín y con todos los orígenes en HTTPS.
+- POSTGRES_PASSWORD y REDIS_PASSWORD fuertes (no vacíos ni placeholders).
+
+Buenas prácticas adicionales:
+
+- Genera secretos con `openssl rand -hex 32` (o el generador de Coolify).
+- Pon DOCS_ENABLED=false en producción.
+- Cierra el alta con ALLOW_REGISTRATION=false tras crear tu usuario.
+- Mantén Redis con contraseña y sin puerto público.
+- Solo app (8080) y api (8000) deben tener dominio público.
+- Nunca subas .env ni secretos reales al repositorio.
+
+## 6. Comprobar la configuración
+
+- Salud básica: `GET /health` (DB + Redis).
+- Salud integral: `GET /health/system` (además el heartbeat del worker).
+  Devuelven 200 si todo está bien y 503 si algo falla.
+- Documentación de la API (si DOCS_ENABLED=true): http://<host>:8000/docs
+
+</script>
+
+<script type="text/markdown" id="doc-03">
+# Guía de despliegue — MarketTracker
+
+Cómo ejecutar MarketTracker en local con Docker, cómo funciona el pipeline CI/CD y
+cómo desplegar en producción con Coolify sobre Oracle Cloud, incluidos backups,
+restauración, rollback y operación diaria.
+
+> El runbook operativo original vive en `deploy/COOLIFY_ORACLE_RUNBOOK.md`. Esta
+> guía lo resume; ante cualquier duda de producción, ese runbook es la fuente canónica.
+
+## 1. Desarrollo local con Docker (recomendado)
+
+Requisitos: Docker y Docker Compose. Opcional: Flutter 3.35.2.
+
+```
+# 1. Copia la plantilla de variables
+cp .env.example .env
+
+# 2. Levanta todo el stack
+docker compose up --build
+```
+
+El fichero docker-compose.yml levanta: db (TimescaleDB, 5432), redis (7, 6379),
+migrate (ejecuta `alembic upgrade head` una vez y termina), api (uvicorn en 8000) y
+worker (sin puerto público). api y worker esperan a que db y redis estén sanos y a
+que migrate termine con éxito.
+
+Una vez arriba: API en http://localhost:8000, documentación en /docs, salud en /health.
+
+### Ejecutar la app Flutter en local
+
+```
+cd app
+flutter create .        # genera android/ios/web/... conservando lib/ y pubspec
+flutter pub get
+flutter run             # apunta por defecto a http://localhost:8000
+```
+
+### Comandos útiles del backend (dentro de backend/)
+
+```
+ruff check .          # lint (bloqueante en CI)
+black .               # aplica formato
+pytest -q             # tests (fakeredis; asyncio_mode=auto)
+alembic upgrade head  # aplicar migraciones
+alembic current       # ver la revisión aplicada
+```
+
+## 2. Pipeline CI/CD
+
+Flujo GitOps: GitHub valida y publica imágenes; solo si CI pasa se dispara el
+despliegue en Coolify.
+
+```
+push/PR a main -> CI (ci.yml)
+   backend: shellcheck, render compose, pip install, alembic upgrade,
+            ruff, black (informativo), pytest, build Dockerfile.production
+   app:     flutter analyze, test, build web, build Dockerfile.web
+        |
+   (solo si CI OK en main)
+   deploy-coolify.yml (workflow_run)
+        verifica SHA = punta de main
+        build & push multiarch (amd64+arm64) a GHCR
+        dispara webhook de Coolify
+        |
+   Coolify aplica compose.production.yml -> smoke test
+```
+
+- **ci.yml**: job backend (con Postgres/Timescale) valida scripts, renderiza el
+  compose de producción, instala dependencias, aplica migraciones, corre ruff
+  (bloqueante), black (informativo), pytest y construye Dockerfile.production. Job
+  app (Flutter): analyze, test, build web y build Dockerfile.web.
+- **deploy-coolify.yml**: se dispara al terminar CI en main. Comprueba el SHA,
+  prepara QEMU+Buildx, verifica ARM64 de TimescaleDB, login en GHCR, build & push
+  multiarch de backend y web (tags main y sha-<commit>), dispara el webhook y
+  ejecuta deploy/smoke.sh. El smoke test espera al release exacto (config.json,
+  /health/system, revisión, worker sano y CORS).
+
+## 3. Producción: Coolify + Oracle Cloud
+
+Solo app y api tienen dominio público:
+
+```
+Internet --HTTPS 443--> Coolify / Traefik (Oracle VM)
+   market.<dominio>     -> app :8080 (Flutter+Nginx)
+   api.market.<dominio> -> api :8000 (FastAPI)
+        red privada interna: TimescaleDB, Redis, Worker, Backup, migrate (one-shot)
+```
+
+### 3.1 Antes de empezar
+
+1. Cuenta de Oracle Cloud y región.
+2. Clave pública SSH.
+3. Dominio con DNS editable y dos subdominios: market.<dominio> (app) y
+   api.market.<dominio> (API). Recomendado coolify.<dominio> para la consola.
+4. Repositorio GitHub del proyecto.
+5. Opcional: credenciales de Twelve Data y Telegram.
+6. Opcional (backups off-host): bucket de OCI Object Storage con Customer Secret Key S3.
+
+> No compartas contraseñas, tokens, claves SSH privadas ni JWT_SECRET por chat ni
+> por Git. Se introducen en Oracle, GitHub Secrets y Coolify.
+
+### 3.2 Crear la VM Always Free (Oracle)
+
+1. VCN con Internet Gateway, subnet pública y route table a Internet.
+2. Instancia Ampere A1 ARM64 con Ubuntu LTS ARM64.
+3. Máximo de CPU/RAM Always Free (recomendado 4+ GB; 12–24 GB evita OOM). 100+ GB
+   de boot volume.
+4. Reserva la IP pública. Adjunta tu clave SSH.
+
+Reglas de firewall: 22/TCP solo tu IP; 80 y 443/TCP abiertos; 8000 y 6001–6002/TCP
+solo tu IP y temporales (alta de Coolify). No abras 5432 ni 6379.
+
+### 3.3 Instalar Coolify
+
+```
+sudo -i
+curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
+```
+
+1. Abre temporalmente http://<IP>:8000 desde tu IP y crea el usuario admin.
+2. Configura coolify.<dominio> con HTTPS.
+3. Cierra o limita 8000/6001/6002 cuando el dominio funcione. Activa MFA.
+4. Verifica el nombre de la red Docker del proxy (normalmente coolify); ese es
+   COOLIFY_NETWORK.
+
+### 3.4 DNS
+
+Registros A a la IP reservada para market.<dominio>, api.market.<dominio> y
+coolify.<dominio>. Espera propagación antes de pedir certificados.
+
+### 3.5 Crear el recurso en Coolify
+
+1. Proyecto MarketTracker, environment production.
+2. Recurso Docker Compose desde GitHub, rama main, Compose /compose.production.yml.
+3. Desactiva Auto Deploy on push (el webhook lo dispara el workflow tras CI).
+4. Copia el deploy webhook.
+5. Asigna dominios solo a: app -> https://market.<dominio>:8080 y
+   api -> https://api.market.<dominio>:8000. No asignes dominio a db, redis,
+   migrate, worker ni backup.
+
+### 3.6 Variables y secretos en Coolify
+
+Copia las claves de `.env.production.example` y sustituye los placeholders:
+
+```
+openssl rand -hex 32   # POSTGRES_PASSWORD
+openssl rand -hex 32   # REDIS_PASSWORD
+openssl rand -hex 64   # JWT_SECRET
+```
+
+Dominio y seguridad:
+
+```
+PUBLIC_API_BASE_URL=https://api.market.<dominio>
+CORS_ORIGINS=https://market.<dominio>
+ENVIRONMENT=production
+DOCS_ENABLED=false
+ALLOW_REGISTRATION=false
+```
+
+Marca como secretos: POSTGRES_PASSWORD, REDIS_PASSWORD, JWT_SECRET,
+TWELVE_DATA_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID y las RCLONE_*.
+
+> El backend permite crear el primer usuario aunque ALLOW_REGISTRATION=false.
+> Créalo de inmediato para cerrar el alta.
+
+### 3.7 Acceso a GHCR
+
+El workflow publica ghcr.io/<owner>/markettrader-backend:main y
+markettrader-web:main (más sha-<commit>). Haz públicos ambos packages, o añade en
+Coolify un registry GHCR con un PAT con permiso read:packages.
+
+### 3.8 Configurar GitHub
+
+Secrets: COOLIFY_DEPLOY_WEBHOOK, SMOKE_EMAIL, SMOKE_PASSWORD.
+Variables: APP_URL, API_URL, TIMESCALE_IMAGE, TIMESCALE_TAG.
+Crea el environment protegido production en GitHub.
+
+### 3.9 Primer despliegue (orden correcto)
+
+1. Guarda primero el recurso Compose en Coolify y copia su webhook.
+2. Configura variables y secrets en GitHub y en Coolify.
+3. Haz push a main (o reejecuta el workflow CI de la punta actual).
+4. Al pasar CI, el workflow publica las imágenes y luego llama a Coolify.
+5. Coolify hace pull y levanta el Compose.
+
+### 3.10 Verificar ARM64 de TimescaleDB
+
+```
+docker buildx imagetools inspect timescale/timescaledb:2.16.1-pg16
+```
+
+Debe aparecer linux/arm64. Si no, cambia TIMESCALE_TAG en GitHub y Coolify.
+
+## 4. Verificación del primer arranque
+
+En Coolify: db y redis healthy; migrate exited (0); api, worker y app healthy;
+backup running; sin dominios/puertos en db/redis.
+
+```
+curl -fsS https://market.<dominio>/healthz
+curl -fsS https://api.market.<dominio>/health
+
+# En la terminal del worker
+python -m app.worker_healthcheck ; echo $?   # 0 = sano
+
+# En la terminal de la API
+alembic current
+```
+
+Registra el primer usuario propietario y confirma ALLOW_REGISTRATION=false.
+
+## 5. Backups
+
+El servicio backup hace `pg_dump -Fc`, valida con `pg_restore --list`, calcula
+SHA-256, conserva copias locales y opcionalmente sube a S3 (OCI) con rclone.
+
+```
+BACKUP_INTERVAL_SECONDS=86400
+BACKUP_RETENTION_DAYS=30
+BACKUP_ON_START=false
+RCLONE_REMOTE=oci
+RCLONE_DESTINATION=market-tracker-backups/production
+RCLONE_CONFIG_OCI_ACCESS_KEY_ID=<access key>
+RCLONE_CONFIG_OCI_SECRET_ACCESS_KEY=<secret key>
+RCLONE_CONFIG_OCI_ENDPOINT=<endpoint S3 OCI>
+RCLONE_CONFIG_OCI_REGION=<region>
+```
+
+Probar un backup (terminal del contenedor backup):
+
+```
+/opt/markettracker/backup.sh
+ls -lh /backups
+/opt/markettracker/verify-backup.sh /backups/<archivo>.dump
+```
+
+> Un backup no es válido hasta que se prueba una restauración. Descarga siempre
+> .dump, .dump.sha256 y .dump.metadata.
+
+## 6. Restauración (ensayada)
+
+No restaures sobre producción con API/worker escribiendo.
+
+1. Activa mantenimiento y detén api/worker. Haz un backup adicional.
+2. En la terminal backup:
+
+```
+CONFIRM_RESTORE=markettracker /opt/markettracker/restore.sh /backups/<archivo>.dump
+```
+
+3. Ejecuta `alembic upgrade head`. Arranca api/worker. Corre deploy/smoke.sh.
+
+Si el log indica que no se pudo cerrar el modo de restauración de Timescale,
+ejecuta `SELECT timescaledb_post_restore();`. Ensaya la restauración al menos
+trimestralmente.
+
+## 7. Rollback de aplicación
+
+No uses alembic downgrade automático.
+
+1. Localiza el último sha-<commit> sano en GitHub Packages/Actions.
+2. En Coolify cambia IMAGE_TAG=sha-<commit-completo> y redespliega.
+3. Ejecuta el smoke test.
+4. Si la migración no era backward-compatible, restaura el backup pre-release en
+   una base limpia y luego despliega el SHA anterior.
+
+> El worker debe permanecer en una sola réplica para no duplicar ingestión ni
+> alertas. api/app pueden escalar más adelante.
+
+## 8. Operación diaria
+
+- Revisa espacio, RAM y volúmenes semanalmente.
+- Actualiza Coolify y el sistema con ventana de mantenimiento y backup previo.
+- No uses tags latest. Usa main para el despliegue habitual y sha-* para rollback.
+- Revisa logs de migración, worker, watchdog y backups.
+- Rota JWT_SECRET, contraseñas y tokens ante cualquier exposición.
+- Nunca guardes secretos en Compose, Git, logs o capturas.
+
+## 9. Limitaciones conocidas
+
+- El JWT del WebSocket viaja en la query string (conviene un ticket efímero).
+- El token web se guarda en almacenamiento accesible por JavaScript: mantén CSP.
+- Telegram es global, no por usuario.
+- Los informes fiscales son un borrador informativo, no asesoramiento.
+- La instancia única no ofrece alta disponibilidad regional.
+
+</script>
+
+<script type="text/markdown" id="doc-04">
+# Manual de usuario — MarketTracker
+
+Guía para usar la aplicación MarketTracker paso a paso. No requiere conocimientos
+técnicos.
+
+## 1. ¿Qué puedes hacer con MarketTracker?
+
+- Seguir precios en vivo de criptomonedas, acciones y forex.
+- Ver gráficos de velas con indicadores técnicos.
+- Recibir alertas cuando el precio o un indicador cruza un umbral.
+- Consultar señales de compra/venta orientativas.
+- Probar estrategias con backtesting.
+- Llevar tu cartera y un libro de operaciones con informe fiscal (FIFO, en euros).
+- Registrar dividendos y splits.
+- Practicar con paper trading (órdenes simuladas, sin dinero real).
+
+> Aviso importante: las señales, backtests e informes fiscales son orientativos e
+> informativos. No constituyen asesoramiento financiero ni fiscal.
+
+## 2. Acceder a la aplicación
+
+Abre la URL de la aplicación en tu navegador. Verás la pantalla de acceso.
+
+### Crear una cuenta
+
+1. Pulsa "¿No tienes cuenta? Regístrate".
+2. Introduce tu email y una contraseña de al menos 8 caracteres.
+3. Pulsa Registrarme.
+
+Mensajes posibles: "Ese email ya está registrado", "La contraseña debe tener al
+menos 8 caracteres" o "El registro está deshabilitado" (el administrador cerró las
+altas; pide que te den de alta).
+
+### Iniciar sesión
+
+Introduce email y contraseña y pulsa Entrar. Si son incorrectos verás
+"Credenciales incorrectas". La sesión se mantiene guardada; si caduca, la app te
+devuelve a esta pantalla.
+
+## 3. La pantalla principal
+
+Barra de navegación inferior con cuatro secciones:
+
+| Sección | Para qué sirve |
+|---------|----------------|
+| Mercado | Resumen del mercado que sigues (dashboard). |
+| Watchlist | Tus activos con precio en vivo. |
+| Cartera | Posiciones y ganancias/pérdidas. |
+| Operaciones | Libro de compras/ventas e informes fiscales. |
+
+El botón de cerrar sesión está arriba a la derecha en la sección Mercado.
+
+## 4. Mercado (Dashboard)
+
+Pantalla de inicio; se refresca sola cada pocos segundos.
+
+- Resumen: número de activos Seguidos, cuántos Suben y cuántos Bajan.
+- Mayores subidas: activos con mayor variación positiva.
+- Mayores bajadas: los de mayor variación negativa.
+- Más volátiles: activos con mayor variación de precio.
+
+Cada fila muestra símbolo, precio y porcentaje de cambio (verde sube, rojo baja).
+Pulsa cualquier fila para abrir el detalle del activo. Desliza hacia abajo para
+actualizar manualmente.
+
+## 5. Watchlist (tus activos)
+
+La lista de activos que quieres seguir en vivo. Los precios se actualizan por
+WebSocket y, como respaldo, por consultas periódicas.
+
+### Añadir un activo
+
+1. Pulsa el botón + (abajo a la derecha).
+2. Escribe el símbolo según su tipo:
+   - Cripto: btcusdt, ethusdt, ...
+   - Acciones: stock:AAPL, stock:MSFT, ...
+   - Forex: fx:EUR/USD, fx:GBP/USD, ...
+3. Pulsa Añadir.
+
+> Para que lleguen precios de acciones o forex, el administrador debe haber
+> configurado la clave de Twelve Data. Sin ella solo funcionan las criptomonedas.
+
+### Quitar un activo
+
+Desliza la fila del activo hacia la izquierda y suéltala.
+
+### Pulsar un activo
+
+Abre su pantalla de detalle (siguiente sección).
+
+## 6. Detalle de un activo
+
+Muestra el gráfico, los indicadores y la señal del activo seleccionado.
+
+### Gráfico de velas
+
+Selecciona el intervalo con el desplegable: 1m, 5m, 1h o 1d. Usa el icono de
+recarga para actualizar.
+
+### Panel de señal
+
+Cuando hay datos suficientes, arriba aparece una tarjeta con la señal: Acción
+(COMPRAR, VENDER, VIGILAR o MANTENER), Fuerza y Confianza, nivel de Riesgo
+(bajo/medio/alto) con su puntuación, y los Motivos que la justifican.
+
+> La señal es cuantitativa y orientativa; no es asesoramiento financiero.
+
+### Panel de indicadores
+
+Valor actual de RSI (14), SMA 20/50, EMA 20, MACD y su señal, ATR (14) y bandas de
+Bollinger. Bajo el RSI verás una pista: Sobrecompra, Sobreventa o Neutral.
+
+### Crear una alerta (icono de campana)
+
+1. Pulsa el icono de campana.
+2. Elige el tipo: Cruce de precio, Variación % (admite negativos) o Cruce de
+   indicador (RSI, SMA 20 o EMA 20).
+3. Elige la dirección: Por encima o Por debajo.
+4. Introduce el valor umbral y pulsa Crear.
+
+Las alertas se evalúan en el servidor de forma continua. Con Telegram configurado
+recibirás la notificación; si no, quedan registradas.
+
+### Ejecutar un backtest (icono de análisis)
+
+Pulsa el icono de análisis y espera unos segundos. Verás un resumen: operaciones,
+% de aciertos, retorno total, retorno medio por operación, máximo drawdown y velas
+analizadas.
+
+> El backtest es una simulación histórica sin comisiones ni slippage. No garantiza
+> rendimientos futuros ni es asesoramiento.
+
+## 7. Cartera
+
+Muestra tus posiciones valoradas y el resultado (P&L). Dos vistas:
+
+- Cartera derivada (por defecto): se calcula a partir de tu libro de operaciones
+  aplicando FIFO en euros.
+- Cartera manual: posiciones que añades a mano (puedes añadir y eliminar).
+
+Cada posición se valora con el precio en vivo del activo.
+
+## 8. Operaciones (libro fiscal)
+
+Registra tus compras y ventas para tener trazabilidad y calcular la fiscalidad por
+FIFO. Es independiente de la cartera manual.
+
+Funciones: ver operaciones con paginación, añadir una operación (compra/venta con
+fecha, cantidad, precio y divisa), importar/exportar (CSV genérico e importadores
+por broker) y eliminar. Desde aquí también accedes al informe fiscal, los eventos
+corporativos y el paper trading. El cambio a euros se autorrellena con los tipos
+del Banco Central Europeo.
+
+## 9. Informe fiscal anual
+
+Calcula, por año, el resultado fiscal aplicando FIFO.
+
+1. Selecciona el año.
+2. Consulta el resumen del ejercicio.
+3. Copia el CSV al portapapeles y pégalo donde lo necesites.
+
+> El informe es un borrador informativo, no asesoramiento fiscal.
+
+## 10. Eventos corporativos
+
+Registra dividendos (con su retención) y splits. Pulsa añadir para registrar un
+evento y elimínalos cuando quieras. Los importes en otras divisas se convierten a
+euros con los tipos del BCE.
+
+## 11. Paper trading (simulado)
+
+Permite practicar con órdenes simuladas a través de Alpaca, sin dinero real. Solo
+está operativo si el administrador ha configurado las credenciales de paper. Cuando
+está activo puedes ver el estado, la cuenta, las posiciones y las órdenes, y crear
+nuevas órdenes simuladas.
+
+> El paper trading siempre opera contra el entorno de práctica de Alpaca. Nunca se
+> ejecutan órdenes con dinero real.
+
+## 12. Notificaciones
+
+Si el administrador ha configurado un bot de Telegram, recibirás por ahí los avisos
+de tus alertas y del watchdog si la ingestión de precios se detiene. Sin Telegram,
+las alertas se evalúan igual y quedan registradas, pero no se envían mensajes.
+
+## 13. Preguntas frecuentes
+
+**No veo precios de una acción que he añadido.** Las acciones y el forex requieren
+que el administrador haya configurado la clave de Twelve Data.
+
+**Me ha echado a la pantalla de login sin hacer nada.** Tu sesión ha caducado.
+Vuelve a iniciar sesión.
+
+**El gráfico dice "Sin datos todavía".** Aún no hay velas suficientes para ese
+activo e intervalo. Espera o prueba un intervalo mayor.
+
+**¿Puedo cerrar la app y no perder mis alertas?** Sí. Alertas, watchlist,
+operaciones y cartera se guardan en el servidor asociadas a tu cuenta.
+
+**¿Las señales me dicen qué comprar?** No. Son indicadores cuantitativos
+orientativos. Las decisiones son tuyas y deberías contrastarlas.
+
+</script>
+
+<script>
+// Renderizador Markdown minimal y autocontenido (sin dependencias externas).
+(function () {
+  function esc(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function inline(s) {
+    // Escapar primero, luego reintroducir formato inline seguro.
+    var t = esc(s);
+    t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
+    t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+    return t;
+  }
+  function render(md) {
+    var lines = md.replace(/\r\n/g, '\n').split('\n');
+    var out = [];
+    var inCode = false, inTable = false, listType = null;
+    function closeList() { if (listType) { out.push('</' + listType + '>'); listType = null; } }
+    function closeTable() { if (inTable) { out.push('</tbody></table>'); inTable = false; } }
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].replace(/\s+$/, '');
+      if (/^```/.test(line)) {
+        if (!inCode) { closeList(); closeTable(); out.push('<pre><code>'); inCode = true; }
+        else { out.push('</code></pre>'); inCode = false; }
+        continue;
+      }
+      if (inCode) { out.push(esc(lines[i])); continue; }
+      if (line === '') { closeList(); closeTable(); continue; }
+      // Tablas
+      if (/^\s*\|.*\|\s*$/.test(line)) {
+        if (/^\s*\|[\s:\-|]+\|\s*$/.test(line)) { continue; } // separador
+        var cells = line.trim().replace(/^\||\|$/g, '').split('|');
+        if (!inTable) {
+          closeList();
+          out.push('<table><thead><tr>');
+          for (var c = 0; c < cells.length; c++) out.push('<th>' + inline(cells[c].trim()) + '</th>');
+          out.push('</tr></thead><tbody>');
+          inTable = true;
+        } else {
+          out.push('<tr>');
+          for (var d = 0; d < cells.length; d++) out.push('<td>' + inline(cells[d].trim()) + '</td>');
+          out.push('</tr>');
+        }
+        continue;
+      } else { closeTable(); }
+      var m;
+      if ((m = line.match(/^(#{1,6})\s+(.*)$/))) { closeList(); var l = m[1].length; out.push('<h' + l + '>' + inline(m[2]) + '</h' + l + '>'); continue; }
+      if ((m = line.match(/^>\s?(.*)$/))) { closeList(); out.push('<blockquote>' + inline(m[1]) + '</blockquote>'); continue; }
+      if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) { closeList(); closeTable(); out.push('<hr />'); continue; }
+      if ((m = line.match(/^\s*\d+\.\s+(.*)$/))) { if (listType !== 'ol') { closeList(); out.push('<ol>'); listType = 'ol'; } out.push('<li>' + inline(m[1]) + '</li>'); continue; }
+      if ((m = line.match(/^\s*[-*+]\s+(.*)$/))) { if (listType !== 'ul') { closeList(); out.push('<ul>'); listType = 'ul'; } out.push('<li>' + inline(m[1]) + '</li>'); continue; }
+      closeList();
+      out.push('<p>' + inline(line) + '</p>');
+    }
+    closeList(); closeTable();
+    if (inCode) out.push('</code></pre>');
+    return out.join('\n');
+  }
+
+  var ids = ['doc-readme', 'doc-01', 'doc-02', 'doc-03', 'doc-04'];
+  var container = document.getElementById('content');
+  var html = '';
+  for (var i = 0; i < ids.length; i++) {
+    var el = document.getElementById(ids[i]);
+    if (!el) continue;
+    html += '<section class="doc">' + render(el.textContent) + '</section>';
+  }
+  container.innerHTML = html;
+})();
+</script>
+</body>
+</html>

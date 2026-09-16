@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Documentación de MarketTracker</title>
+<meta name="description" content="Documentación completa de MarketTracker: guía del proyecto, configuración, despliegue y manual de usuario." />
+<style>
+  :root {
+    --bg: #0b1220; --panel: #111c33; --card: #16233f; --border: #24344f;
+    --text: #e6edf7; --muted: #9fb0c9; --accent: #3b82f6; --accent-2: #60a5fa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: linear-gradient(160deg, #0b1220 0%, #0d1730 100%); color: var(--text);
+    line-height: 1.6; min-height: 100vh;
+  }
+  a { color: var(--accent-2); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 48px 24px 72px; }
+  header.hero { text-align: center; padding: 24px 0 8px; }
+  .logo { font-size: 3rem; }
+  h1 { font-size: 2.2rem; margin: .3em 0 .1em; letter-spacing: -.01em; }
+  .tagline { color: var(--muted); font-size: 1.1rem; margin: 0 auto; max-width: 640px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; margin: 40px 0; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 22px 22px 20px; transition: transform .12s ease, border-color .12s ease;
+    display: flex; flex-direction: column;
+  }
+  .card:hover { transform: translateY(-3px); border-color: var(--accent); }
+  .card .num { color: var(--accent-2); font-weight: 700; font-size: .82rem; letter-spacing: .08em; }
+  .card h2 { font-size: 1.15rem; margin: .3em 0 .35em; }
+  .card p { color: var(--muted); font-size: .93rem; margin: 0 0 16px; flex: 1; }
+  .card .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn {
+    display: inline-block; padding: 8px 14px; border-radius: 8px; font-size: .88rem;
+    font-weight: 600; border: 1px solid var(--border);
+  }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.primary:hover { background: var(--accent-2); text-decoration: none; }
+  .btn.ghost { color: var(--text); }
+  .btn.ghost:hover { border-color: var(--accent); text-decoration: none; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    padding: 24px 26px; margin: 28px 0;
+  }
+  .panel h2 { margin-top: 0; }
+  .panel ul { color: var(--muted); }
+  .allinone { text-align: center; padding: 30px; }
+  .allinone .btn.primary { font-size: 1rem; padding: 12px 24px; }
+  code { background: #0a1526; border: 1px solid var(--border); padding: .1em .4em; border-radius: 5px; font-family: Consolas, monospace; font-size: .88em; }
+  footer { color: var(--muted); text-align: center; font-size: .85rem; margin-top: 40px; }
+  .repo-links { margin-top: 10px; }
+  .repo-links a { margin: 0 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="logo">📈</div>
+    <h1>Documentación de MarketTracker</h1>
+    <p class="tagline">Herramienta de seguimiento y análisis de mercados financieros (cripto, forex y acciones). Todo el conocimiento del proyecto, en un solo lugar.</p>
+  </header>
+
+  <div class="panel allinone">
+    <h2>Todo en un único documento</h2>
+    <p class="tagline">Las cuatro guías reunidas en una sola página navegable, lista para leer o exportar a PDF.</p>
+    <p style="margin-top:18px">
+      <a class="btn primary" href="completo.html">📖 Abrir documento completo</a>
+      <a class="btn ghost" href="pdf/MarketTracker-Documentacion.pdf">⬇️ Descargar PDF completo</a>
+    </p>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <span class="num">01</span>
+      <h2>Guía del proyecto</h2>
+      <p>Arquitectura, componentes, principios de diseño, módulos del backend, worker de ingestión, app Flutter y modelo de datos.</p>
+      <div class="actions">
+        <a class="btn primary" href="01-guia-del-proyecto.html">Leer</a>
+        <a class="btn ghost" href="pdf/01-guia-del-proyecto.pdf">PDF</a>
+      </div>
+    </div>
+    <div class="card">
+      <span class="num">02</span>
+      <h2>Guía de configuración</h2>
+      <p>Todas las variables de entorno del backend y de la app, secretos, seguridad e integraciones opcionales.</p>
+      <div class="actions">
+        <a class="btn primary" href="02-guia-de-configuracion.html">Leer</a>
+        <a class="btn ghost" href="pdf/02-guia-de-configuracion.pdf">PDF</a>
+      </div>
+    </div>
+    <div class="card">
+      <span class="num">03</span>
+      <h2>Guía de despliegue</h2>
+      <p>Local con Docker, CI/CD, Coolify + Oracle Cloud, backups, restauración, rollback y operación diaria.</p>
+      <div class="actions">
+        <a class="btn primary" href="03-guia-de-despliegue.html">Leer</a>
+        <a class="btn ghost" href="pdf/03-guia-de-despliegue.pdf">PDF</a>
+      </div>
+    </div>
+    <div class="card">
+      <span class="num">04</span>
+      <h2>Manual de usuario</h2>
+      <p>Cómo usar cada pantalla y función de la aplicación, paso a paso. Sin conocimientos técnicos.</p>
+      <div class="actions">
+        <a class="btn primary" href="04-manual-de-usuario.html">Leer</a>
+        <a class="btn ghost" href="pdf/04-manual-de-usuario.pdf">PDF</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>¿Qué es MarketTracker?</h2>
+    <p>Un backend <strong>FastAPI</strong> con un worker de ingestión asyncio, <strong>TimescaleDB</strong> (solo velas cerradas) y <strong>Redis</strong> (precio en vivo, caché y pub/sub), más una app <strong>Flutter</strong> multiplataforma servida como web tras Nginx. Se despliega con GitHub Actions → GHCR → Coolify sobre Oracle Cloud.</p>
+    <ul>
+      <li>Precios en vivo, velas históricas y gráfico de velas nativo.</li>
+      <li>Alertas, señales técnicas explicables y backtesting.</li>
+      <li>Cartera, libro de operaciones con informe fiscal (FIFO en EUR) y eventos corporativos.</li>
+      <li>Paper trading con Alpaca (sin dinero real) y notificaciones por Telegram.</li>
+    </ul>
+  </div>
+
+  <footer>
+    <div>Documentación generada para el proyecto MarketTracker.</div>
+    <div class="repo-links">
+      <a href="https://github.com/bonairda/MarketTrader">Repositorio en GitHub</a>
+    </div>
+  </footer>
+</div>
+</body>
+</html>
