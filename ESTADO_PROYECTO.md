@@ -19,9 +19,9 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 
 | Fase | Descripción | Estado |
 |------|-------------|--------|
-| F0 | Cimientos (repos, Docker, esqueleto backend) | En curso |
-| F1 | MVP: cripto en vivo + watchlist + velas + 1 alerta | Parcial (backend base hecho, falta alerta y app) |
-| F2 | Acciones/forex, indicadores, dashboard | Pendiente |
+| F0 | Cimientos (repos, Docker, esqueleto backend) + consolidación (bloques A/B/C) | Completa |
+| F1 | MVP: cripto en vivo + watchlist + velas + alertas + app | Completa |
+| F2 | Acciones/forex, indicadores, dashboard | Pendiente (siguiente) |
 | F3 | Señales, riesgo, mercados llamativos | Pendiente |
 | F4 | Backtesting, cartera/simulación | Pendiente |
 | F5 | Multiusuario, roles, producto comercial | Pendiente |
@@ -73,18 +73,26 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 
 ## 4. Desarrollos pendientes
 
-### F1 (para cerrar el MVP)
-- [x] **Cliente Flutter** (ordenador + móvil + web): watchlist en vivo (polling REST) + detalle de activo con velas.
+### F1 — COMPLETA
+- [x] **Cliente Flutter** (ordenador + móvil + web): watchlist en vivo + detalle de activo con velas.
       Carpeta `app/` (solo `lib/` + `pubspec.yaml`; las plataformas se generan con `flutter create .`).
 - [x] **WebSocket gateway** (`GET /market/ws`): el worker publica ticks en Redis pub/sub
-      (`live:ticks`) y el gateway los reenvía a los clientes. La app se conecta por WS con
-      reconexión automática y usa polling REST solo como respaldo.
+      (`live:ticks`), broadcaster con una suscripción por proceso y fan-out a clientes. La app se
+      conecta por WS con reconexión automática y usa polling REST solo como respaldo.
 - [x] Módulo de **alertas**: reglas de cruce de precio evaluadas en el worker por cada tick
-      (detecta cruce, no nivel; con cooldown por regla), notificación por **Telegram**, y CRUD por API.
-      La app permite crear alertas desde el detalle del activo. El worker recarga reglas cada 30 s.
-- [ ] **FCM (push móvil)**: hoy las alertas van por Telegram. FCM requiere proyecto Firebase + credenciales.
-- [ ] Backfill histórico de velas al añadir un activo a la watchlist.
-- [ ] Recargar suscripciones del worker cuando cambia la watchlist (hoy se leen al arrancar).
+      (detecta cruce, no nivel; cooldown atómico en Redis), notificación por los canales
+      configurados, y CRUD por API. La app crea alertas desde el detalle del activo.
+- [x] **Gestión de watchlist desde la app**: añadir (botón +) y quitar (swipe) símbolos.
+- [x] **Resuscripción en caliente**: al cambiar la watchlist se publica un evento (`watchlist:changed`)
+      y el worker se resuscribe a los nuevos símbolos sin reiniciarse.
+- [x] **Backfill histórico**: al añadir un activo se cargan sus velas recientes (Binance klines REST)
+      en segundo plano, para tener gráfico desde el primer momento.
+- [x] **Abstracción de notificaciones**: interfaz `Notifier` + despachador que envía por todos los
+      canales configurados. Telegram implementado; **FCM** dejado como stub documentado.
+
+Pendiente futuro (no bloquea F1):
+- [ ] **FCM (push móvil)**: completar `FcmNotifier` (requiere proyecto Firebase + credenciales y
+      registro de tokens de dispositivo). La abstracción ya está lista; solo falta la implementación.
 
 ### F2
 - [ ] Adaptador de acciones/forex (Twelve Data o Polygon), aceptando retraso ~15 min.

@@ -11,15 +11,18 @@ import json
 import random
 from collections.abc import AsyncIterator
 
+import httpx
 import websockets
 
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.providers.base import MarketDataProvider, Tick
+from app.providers.base import HistoricalBar, MarketDataProvider, Tick
 
 log = get_logger("providers.binance")
 
 _MAX_BACKOFF_SECONDS = 30
+# Endpoint REST público de klines (velas) de Binance.
+_KLINES_URL = "https://api.binance.com/api/v3/klines"
 
 
 class BinanceProvider(MarketDataProvider):
@@ -69,3 +72,35 @@ class BinanceProvider(MarketDataProvider):
         except (json.JSONDecodeError, KeyError, ValueError):
             # Mensaje de control o formato inesperado: se ignora sin romper el stream.
             return None
+
+    async def fetch_historical_bars(
+        self, symbol: str, interval: str = "1m", limit: int = 500
+    ) -> list[HistoricalBar]:
+        params = {"symbol": symbol.upper(), "interval": interval, "limit": limit}
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                res = await client.get(_KLINES_URL, params=params)
+                res.raise_for_status()
+                rows = res.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            log.warning("[INGESTION] Backfill fallido para %s: %s", symbol, exc)
+            return []
+
+        return [self._parse_kline(symbol, row) for row in rows if self._is_valid_kline(row)]
+
+    @staticmethod
+    def _is_valid_kline(row: object) -> bool:
+        return isinstance(row, list) and len(row) >= 6
+
+    @staticmethod
+    def _parse_kline(symbol: str, row: list) -> HistoricalBar:
+        # Formato Binance kline: [openTime, open, high, low, close, volume, ...]
+        return HistoricalBar(
+            symbol=symbol.lower(),
+            open_time_ms=int(row[0]),
+            open=float(row[1]),
+            high=float(row[2]),
+            low=float(row[3]),
+            close=float(row[4]),
+            volume=float(row[5]),
+        )

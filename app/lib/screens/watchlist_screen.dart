@@ -82,6 +82,45 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     );
   }
 
+  Future<void> _openAddSymbol() async {
+    final symbol = await showDialog<String>(
+      context: context,
+      builder: (_) => const _AddSymbolDialog(),
+    );
+    if (symbol == null || symbol.isEmpty) return;
+    try {
+      await widget.api.addToWatchlist(symbol);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${symbol.toUpperCase()} añadido a la watchlist')),
+      );
+      await _load(silent: true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al añadir: $e')),
+      );
+    }
+  }
+
+  Future<void> _removeSymbol(String symbol) async {
+    try {
+      await widget.api.removeFromWatchlist(symbol);
+      if (!mounted) return;
+      setState(() => _prices.remove(symbol));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${symbol.toUpperCase()} eliminado')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al eliminar: $e')),
+      );
+      // Recarga para reflejar el estado real si falló.
+      await _load(silent: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -94,6 +133,11 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
             tooltip: 'Refrescar',
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _openAddSymbol,
+        tooltip: 'Añadir símbolo',
+        child: const Icon(Icons.add),
       ),
       body: _buildBody(),
     );
@@ -122,7 +166,15 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       );
     }
     if (_prices.isEmpty) {
-      return const Center(child: Text('La watchlist está vacía o sin datos aún.'));
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'La watchlist está vacía o sin datos aún.\nUsa el botón + para añadir un símbolo.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
     }
     final items = _prices.values.toList()
       ..sort((a, b) => a.symbol.compareTo(b.symbol));
@@ -133,17 +185,76 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         separatorBuilder: (_, __) => const Divider(height: 1),
         itemBuilder: (context, index) {
           final p = items[index];
-          return ListTile(
-            title: Text(p.symbol.toUpperCase(),
-                style: const TextStyle(fontWeight: FontWeight.w600)),
-            trailing: Text(
-              _priceFormat.format(p.price),
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          return Dismissible(
+            key: ValueKey(p.symbol),
+            direction: DismissDirection.endToStart,
+            background: Container(
+              color: Colors.red.shade400,
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 20),
+              child: const Icon(Icons.delete, color: Colors.white),
             ),
-            onTap: () => _openDetail(p.symbol),
+            onDismissed: (_) => _removeSymbol(p.symbol),
+            child: ListTile(
+              title: Text(p.symbol.toUpperCase(),
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              trailing: Text(
+                _priceFormat.format(p.price),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              onTap: () => _openDetail(p.symbol),
+            ),
           );
         },
       ),
+    );
+  }
+}
+
+/// Diálogo para añadir un símbolo a la watchlist.
+class _AddSymbolDialog extends StatefulWidget {
+  const _AddSymbolDialog();
+
+  @override
+  State<_AddSymbolDialog> createState() => _AddSymbolDialogState();
+}
+
+class _AddSymbolDialogState extends State<_AddSymbolDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final value = _controller.text.trim().toLowerCase();
+    if (value.isEmpty) return;
+    Navigator.of(context).pop(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Añadir símbolo'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (_) => _submit(),
+        decoration: const InputDecoration(
+          labelText: 'Símbolo',
+          hintText: 'p. ej. btcusdt',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Añadir')),
+      ],
     );
   }
 }

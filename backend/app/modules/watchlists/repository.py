@@ -5,6 +5,7 @@ from __future__ import annotations
 from sqlalchemy import text
 
 from app.core.db import SessionLocal
+from app.modules.watchlists.events import notify_watchlist_changed
 
 
 async def list_items() -> list[str]:
@@ -26,6 +27,7 @@ async def add_item(asset_id: str, notes: str | None = None) -> None:
             {"asset_id": asset_id, "notes": notes},
         )
         await session.commit()
+    await notify_watchlist_changed()
 
 
 async def remove_item(asset_id: str) -> None:
@@ -35,3 +37,4 @@ async def remove_item(asset_id: str) -> None:
             {"asset_id": asset_id},
         )
         await session.commit()
+    await notify_watchlist_changed()

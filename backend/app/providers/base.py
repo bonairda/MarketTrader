@@ -20,6 +20,19 @@ class Tick:
     timestamp_ms: int
 
 
+@dataclass
+class HistoricalBar:
+    """Una vela histórica normalizada (para backfill)."""
+
+    symbol: str
+    open_time_ms: int
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float | None = None
+
+
 class MarketDataProvider(ABC):
     """Interfaz que todos los adaptadores de proveedores deben implementar."""
 
@@ -31,4 +44,11 @@ class MarketDataProvider(ABC):
         y deben gestionar la reconexión internamente, sin romper el bucle
         consumidor ante caídas puntuales de red.
         """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def fetch_historical_bars(
+        self, symbol: str, interval: str = "1m", limit: int = 500
+    ) -> list[HistoricalBar]:
+        """Devuelve velas históricas recientes para el backfill de un activo."""
         raise NotImplementedError

@@ -20,7 +20,7 @@ from __future__ import annotations
 from app.core.logging import get_logger
 from app.core.redis_client import get_redis
 from app.modules.alerts import repository as alerts_repo
-from app.modules.notifications import telegram
+from app.modules.notifications import dispatcher
 
 log = get_logger("alerts.engine")
 
@@ -95,5 +95,5 @@ class AlertEngine:
             f"ha cruzado {arrow} {rule['threshold']:g}"
         )
         log.info("[ALERT] Disparada regla %s: %s", rule["id"], message)
-        await telegram.send_message(message)
+        await dispatcher.notify(message)
         await alerts_repo.mark_triggered(rule["id"])

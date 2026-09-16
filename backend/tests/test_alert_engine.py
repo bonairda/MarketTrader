@@ -26,7 +26,7 @@ def fired(monkeypatch):
     async def fake_mark(rule_id):
         return None
 
-    monkeypatch.setattr(engine_module.telegram, "send_message", fake_send)
+    monkeypatch.setattr(engine_module.dispatcher, "notify", fake_send)
     monkeypatch.setattr(engine_module.alerts_repo, "mark_triggered", fake_mark)
     return messages
 
