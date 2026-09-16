@@ -104,11 +104,13 @@ def _providers_for(grouped: dict[ProviderKind, list[str]]) -> list[tuple[MarketD
 async def _maintenance(
     aggregator: BarAggregator, alert_engine: AlertEngine, monitor: IngestionMonitor
 ) -> None:
-    """Cierra velas vencidas, recarga reglas y vigila la ingestión (watchdog)."""
+    """Cierra velas vencidas, evalúa alertas por velas/indicadores, recarga
+    reglas y vigila la ingestión (watchdog)."""
     seconds_since_rules = 0
     while True:
         await asyncio.sleep(_MAINTENANCE_INTERVAL_SECONDS)
         await aggregator.flush_stale()
+        await alert_engine.evaluate_candle_based()
         await monitor.check()
         seconds_since_rules += _MAINTENANCE_INTERVAL_SECONDS
         if seconds_since_rules >= _RULES_REFRESH_SECONDS:

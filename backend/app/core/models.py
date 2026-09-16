@@ -62,9 +62,14 @@ class AlertRule(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     asset_id: Mapped[str] = mapped_column(String, nullable=False)
+    # PRICE_CROSS | PERCENT_CHANGE | INDICATOR_CROSS
     type: Mapped[str] = mapped_column(String, nullable=False, default="PRICE_CROSS")
     direction: Mapped[str] = mapped_column(String, nullable=False, default="ABOVE")
     threshold: Mapped[float] = mapped_column(Float, nullable=False)
+    # Indicador a vigilar en INDICATOR_CROSS (p. ej. "rsi14"). Nulo en otros tipos.
+    indicator: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Intervalo de velas usado por PERCENT_CHANGE / INDICATOR_CROSS.
+    timeframe: Mapped[str] = mapped_column(String, nullable=False, default="1m")
     channels: Mapped[str] = mapped_column(String, nullable=False, default="TELEGRAM")
     cooldown_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=300)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

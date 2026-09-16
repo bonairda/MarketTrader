@@ -31,14 +31,30 @@ def fired(monkeypatch):
     return messages
 
 
-def _rule(direction="ABOVE", threshold=100.0, cooldown=300, rid="r1"):
+def _rule(
+    direction="ABOVE",
+    threshold=100.0,
+    cooldown=300,
+    rid="r1",
+    rule_type="PRICE_CROSS",
+    indicator=None,
+    timeframe="1m",
+):
     return {
         "id": rid,
         "assetId": "btcusdt",
+        "type": rule_type,
         "direction": direction,
         "threshold": threshold,
+        "indicator": indicator,
+        "timeframe": timeframe,
         "cooldownSeconds": cooldown,
     }
+
+
+def _candle(close, open_=None):
+    o = open_ if open_ is not None else close
+    return {"open": o, "high": max(o, close), "low": min(o, close), "close": close}
 
 
 async def test_no_fire_without_two_prices(fake_redis, fired):
@@ -101,3 +117,74 @@ async def test_no_rules_no_fire(fake_redis, fired):
     await engine.on_tick("btcusdt", 90)
     await engine.on_tick("btcusdt", 110)
     assert fired == []
+
+
+async def test_tick_ignores_non_price_cross_rules(fake_redis, fired):
+    engine = AlertEngine()
+    # Una regla PERCENT_CHANGE no debe evaluarse en on_tick.
+    engine._rules_by_symbol = {"btcusdt": [_rule(rule_type="PERCENT_CHANGE", threshold=5)]}
+    await engine.on_tick("btcusdt", 90)
+    await engine.on_tick("btcusdt", 200)
+    assert fired == []
+
+
+# ----------------------------- PERCENT_CHANGE -----------------------------
+
+async def test_percent_change_fires_above(fake_redis, fired, monkeypatch):
+    engine = AlertEngine()
+    engine._rules_by_symbol = {
+        "btcusdt": [_rule(rule_type="PERCENT_CHANGE", direction="ABOVE", threshold=5)]
+    }
+
+    # Apertura 100, último cierre 110 -> +10% (supera el umbral de 5%).
+    async def fake_bars(symbol, interval, limit=1440):
+        return [_candle(100, open_=100), _candle(110)]
+
+    monkeypatch.setattr(engine_module.bars, "get_bars", fake_bars)
+    await engine.evaluate_candle_based()
+    assert len(fired) == 1
+    assert "subido" in fired[0]
+
+
+async def test_percent_change_no_fire_below_threshold(fake_redis, fired, monkeypatch):
+    engine = AlertEngine()
+    engine._rules_by_symbol = {
+        "btcusdt": [_rule(rule_type="PERCENT_CHANGE", direction="ABOVE", threshold=20)]
+    }
+
+    async def fake_bars(symbol, interval, limit=1440):
+        return [_candle(100, open_=100), _candle(110)]  # +10% < 20%
+
+    monkeypatch.setattr(engine_module.bars, "get_bars", fake_bars)
+    await engine.evaluate_candle_based()
+    assert fired == []
+
+
+# ----------------------------- INDICATOR_CROSS -----------------------------
+
+async def test_indicator_cross_rsi_above(fake_redis, fired, monkeypatch):
+    engine = AlertEngine()
+    engine._rules_by_symbol = {
+        "btcusdt": [
+            _rule(rule_type="INDICATOR_CROSS", indicator="rsi14", direction="ABOVE", threshold=70)
+        ]
+    }
+
+    # Serie que sube fuerte: RSI alto (>70). Se necesitan dos evaluaciones para
+    # detectar el cruce (primera guarda el valor, segunda compara).
+    async def rising(symbol, interval, limit=500):
+        return [_candle(float(i), open_=float(i)) for i in range(1, 40)]
+
+    async def flat_low(symbol, interval, limit=500):
+        # Serie plana tras una bajada -> RSI bajo.
+        return [_candle(float(40 - i), open_=float(40 - i)) for i in range(1, 40)]
+
+    # Primera evaluación con RSI bajo (siembra el "prev"), luego con RSI alto.
+    monkeypatch.setattr(engine_module.bars, "get_bars", flat_low)
+    await engine.evaluate_candle_based()  # guarda prev (RSI bajo), no dispara
+    assert fired == []
+
+    monkeypatch.setattr(engine_module.bars, "get_bars", rising)
+    await engine.evaluate_candle_based()  # RSI cruza por encima de 70 -> dispara
+    assert len(fired) == 1
+    assert "RSI14" in fired[0]

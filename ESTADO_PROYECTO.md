@@ -21,8 +21,8 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 |------|-------------|--------|
 | F0 | Cimientos (repos, Docker, esqueleto backend) + consolidación (bloques A/B/C) | Completa |
 | F1 | MVP: cripto en vivo + watchlist + velas + alertas + app | Completa |
-| F2 | Acciones/forex, indicadores, dashboard | Pendiente (siguiente) |
-| F3 | Señales, riesgo, mercados llamativos | Pendiente |
+| F2 | Acciones/forex, indicadores, dashboard, tipos de alerta | Completa |
+| F3 | Señales, riesgo, mercados llamativos | Pendiente (siguiente) |
 | F4 | Backtesting, cartera/simulación | Pendiente |
 | F5 | Multiusuario, roles, producto comercial | Pendiente |
 
@@ -96,7 +96,7 @@ Pendiente futuro (no bloquea F1):
 - [ ] **FCM (push móvil)**: completar `FcmNotifier` (requiere proyecto Firebase + credenciales y
       registro de tokens de dispositivo). La abstracción ya está lista; solo falta la implementación.
 
-### F2 (en curso)
+### F2 — COMPLETA
 - [x] **Indicadores técnicos** (SMA/EMA, RSI, MACD, ATR, Bollinger, retornos) en Python puro
       (`market_data/indicators.py`), calculados bajo demanda vía `GET /market/indicators/{symbol}`
       (`indicators_service.py`). Con tests de valores conocidos y casos borde.
@@ -110,7 +110,10 @@ Pendiente futuro (no bloquea F1):
       (cambio %, máx/mín, volatilidad), top movers (subidas/bajadas) y más volátiles.
       Métricas puras en `dashboard/metrics.py` con tests. La app tiene pantalla de Mercado
       con navegación inferior (Mercado / Watchlist).
-- [ ] Más tipos de alerta (%, volatilidad, volumen, cruce de indicador).
+- [x] **Más tipos de alerta**: además de cruce de precio (`PRICE_CROSS`), ahora hay
+      variación porcentual (`PERCENT_CHANGE`) y cruce de indicador (`INDICATOR_CROSS`,
+      p. ej. RSI14 por encima de 70). Los de precio se evalúan por tick; los de velas/indicador
+      periódicamente en el worker. La app permite elegir el tipo en el diálogo de alerta.
 
 ### F3
 - [ ] Motor de señales por reglas (BUY/SELL/HOLD/WATCH) con explicación (`rationale`).

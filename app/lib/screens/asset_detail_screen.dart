@@ -75,10 +75,12 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
     );
     if (result == null) return;
     try {
-      await widget.api.createPriceAlert(
+      await widget.api.createAlert(
         assetId: widget.symbol,
+        type: result.type,
         direction: result.direction,
         threshold: result.threshold,
+        indicator: result.indicator,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -225,9 +227,16 @@ class _IndicatorsPanel extends StatelessWidget {
 
 /// Datos que devuelve el diálogo de creación de alerta.
 class _AlertInput {
-  const _AlertInput({required this.direction, required this.threshold});
+  const _AlertInput({
+    required this.type,
+    required this.direction,
+    required this.threshold,
+    this.indicator,
+  });
+  final String type;
   final String direction;
   final double threshold;
+  final String? indicator;
 }
 
 class _CreateAlertDialog extends StatefulWidget {
@@ -240,7 +249,12 @@ class _CreateAlertDialog extends StatefulWidget {
 class _CreateAlertDialogState extends State<_CreateAlertDialog> {
   final _formKey = GlobalKey<FormState>();
   final _controller = TextEditingController();
+  String _type = 'PRICE_CROSS';
   String _direction = 'ABOVE';
+  String _indicator = 'rsi14';
+
+  bool get _isIndicator => _type == 'INDICATOR_CROSS';
+  bool get _isPercent => _type == 'PERCENT_CHANGE';
 
   @override
   void dispose() {
@@ -248,43 +262,89 @@ class _CreateAlertDialogState extends State<_CreateAlertDialog> {
     super.dispose();
   }
 
+  String get _thresholdLabel {
+    if (_isPercent) return 'Variación umbral (%)';
+    if (_isIndicator) return 'Valor umbral del indicador';
+    return 'Precio umbral';
+  }
+
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     final value = double.parse(_controller.text.replaceAll(',', '.'));
-    Navigator.of(context).pop(_AlertInput(direction: _direction, threshold: value));
+    Navigator.of(context).pop(
+      _AlertInput(
+        type: _type,
+        direction: _direction,
+        threshold: value,
+        indicator: _isIndicator ? _indicator : null,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Nueva alerta de precio'),
-      content: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'ABOVE', label: Text('Sube por encima')),
-                ButtonSegment(value: 'BELOW', label: Text('Baja por debajo')),
+      title: const Text('Nueva alerta'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: _type,
+                decoration: const InputDecoration(labelText: 'Tipo de alerta'),
+                items: const [
+                  DropdownMenuItem(value: 'PRICE_CROSS', child: Text('Cruce de precio')),
+                  DropdownMenuItem(value: 'PERCENT_CHANGE', child: Text('Variación %')),
+                  DropdownMenuItem(value: 'INDICATOR_CROSS', child: Text('Cruce de indicador')),
+                ],
+                onChanged: (v) => setState(() => _type = v ?? 'PRICE_CROSS'),
+              ),
+              if (_isIndicator) ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _indicator,
+                  decoration: const InputDecoration(labelText: 'Indicador'),
+                  items: const [
+                    DropdownMenuItem(value: 'rsi14', child: Text('RSI (14)')),
+                    DropdownMenuItem(value: 'sma20', child: Text('SMA 20')),
+                    DropdownMenuItem(value: 'ema20', child: Text('EMA 20')),
+                  ],
+                  onChanged: (v) => setState(() => _indicator = v ?? 'rsi14'),
+                ),
               ],
-              selected: {_direction},
-              onSelectionChanged: (s) => setState(() => _direction = s.first),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Precio umbral'),
-              validator: (v) {
-                final parsed = double.tryParse((v ?? '').replaceAll(',', '.'));
-                if (parsed == null || parsed <= 0) {
-                  return 'Introduce un precio válido mayor que 0';
-                }
-                return null;
-              },
-            ),
-          ],
+              const SizedBox(height: 16),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'ABOVE', label: Text('Por encima')),
+                  ButtonSegment(value: 'BELOW', label: Text('Por debajo')),
+                ],
+                selected: {_direction},
+                onSelectionChanged: (s) => setState(() => _direction = s.first),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _controller,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                  signed: true,
+                ),
+                decoration: InputDecoration(labelText: _thresholdLabel),
+                validator: (v) {
+                  final parsed = double.tryParse((v ?? '').replaceAll(',', '.'));
+                  if (parsed == null) {
+                    return 'Introduce un número válido';
+                  }
+                  // Precio e indicador requieren > 0; la variación % admite negativos.
+                  if (!_isPercent && parsed <= 0) {
+                    return 'Debe ser mayor que 0';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
         ),
       ),
       actions: [

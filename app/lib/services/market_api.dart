@@ -87,21 +87,30 @@ class MarketApi {
     _ensureOk(res);
   }
 
-  /// POST /alerts -> crea una alerta de cruce de precio.
-  /// [direction] debe ser 'ABOVE' o 'BELOW'.
-  Future<void> createPriceAlert({
+  /// POST /alerts -> crea una alerta.
+  /// [type]: PRICE_CROSS | PERCENT_CHANGE | INDICATOR_CROSS.
+  /// [direction]: 'ABOVE' o 'BELOW'.
+  /// [indicator]: solo para INDICATOR_CROSS (ej. 'rsi14').
+  Future<void> createAlert({
     required String assetId,
+    required String type,
     required String direction,
     required double threshold,
+    String? indicator,
+    String timeframe = '1m',
   }) async {
+    final body = <String, dynamic>{
+      'assetId': assetId,
+      'type': type,
+      'direction': direction,
+      'threshold': threshold,
+      'timeframe': timeframe,
+    };
+    if (indicator != null) body['indicator'] = indicator;
     final res = await _client.post(
       Uri.parse('$_base/alerts'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'assetId': assetId,
-        'direction': direction,
-        'threshold': threshold,
-      }),
+      body: jsonEncode(body),
     );
     _ensureOk(res);
   }

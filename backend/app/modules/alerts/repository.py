@@ -16,6 +16,8 @@ def _row_to_dict(r) -> dict:
         "type": r.type,
         "direction": r.direction,
         "threshold": r.threshold,
+        "indicator": r.indicator,
+        "timeframe": r.timeframe,
         "channels": r.channels,
         "cooldownSeconds": r.cooldown_seconds,
         "enabled": r.enabled,
@@ -35,8 +37,11 @@ async def list_rules(only_enabled: bool = False) -> list[dict]:
 
 async def create_rule(
     asset_id: str,
+    rule_type: str,
     direction: str,
     threshold: float,
+    indicator: str | None = None,
+    timeframe: str = "1m",
     channels: str = "TELEGRAM",
     cooldown_seconds: int = 300,
 ) -> dict:
@@ -46,16 +51,21 @@ async def create_rule(
             text(
                 """
                 INSERT INTO alert_rules
-                    (id, asset_id, type, direction, threshold, channels, cooldown_seconds, enabled)
+                    (id, asset_id, type, direction, threshold, indicator, timeframe,
+                     channels, cooldown_seconds, enabled)
                 VALUES
-                    (:id, :asset_id, 'PRICE_CROSS', :direction, :threshold, :channels, :cooldown, TRUE)
+                    (:id, :asset_id, :type, :direction, :threshold, :indicator, :timeframe,
+                     :channels, :cooldown, TRUE)
                 """
             ),
             {
                 "id": rule_id,
                 "asset_id": asset_id,
+                "type": rule_type,
                 "direction": direction,
                 "threshold": threshold,
+                "indicator": indicator,
+                "timeframe": timeframe,
                 "channels": channels,
                 "cooldown": cooldown_seconds,
             },
@@ -64,8 +74,11 @@ async def create_rule(
     return {
         "id": rule_id,
         "assetId": asset_id,
+        "type": rule_type,
         "direction": direction,
         "threshold": threshold,
+        "indicator": indicator,
+        "timeframe": timeframe,
         "channels": channels,
         "cooldownSeconds": cooldown_seconds,
         "enabled": True,
