@@ -23,6 +23,21 @@ class Base(DeclarativeBase):
     pass
 
 
+class User(Base):
+    """Usuario de la aplicación. El `role` controla los permisos (OWNER/VIEWER)."""
+
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    hashed_password: Mapped[str] = mapped_column(String, nullable=False)
+    role: Mapped[str] = mapped_column(String, nullable=False, default="OWNER")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
 class Asset(Base):
     __tablename__ = "assets"
 
@@ -50,6 +65,9 @@ class PriceBar(Base):
 class WatchlistItem(Base):
     __tablename__ = "watchlist_items"
 
+    # Clave compuesta: cada usuario tiene su propia watchlist; dos usuarios
+    # pueden seguir el mismo activo de forma independiente.
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
     asset_id: Mapped[str] = mapped_column(String, primary_key=True)
     added_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -61,6 +79,7 @@ class AlertRule(Base):
     __tablename__ = "alert_rules"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
     asset_id: Mapped[str] = mapped_column(String, nullable=False)
     # PRICE_CROSS | PERCENT_CHANGE | INDICATOR_CROSS
     type: Mapped[str] = mapped_column(String, nullable=False, default="PRICE_CROSS")
@@ -84,6 +103,7 @@ class Position(Base):
     __tablename__ = "positions"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
     asset_id: Mapped[str] = mapped_column(String, nullable=False)
     quantity: Mapped[float] = mapped_column(Float, nullable=False)
     average_price: Mapped[float] = mapped_column(Float, nullable=False)

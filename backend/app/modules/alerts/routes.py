@@ -1,9 +1,11 @@
 """Endpoints de reglas de alerta."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.errors import NotFoundError
 from app.modules.alerts import repository
+from app.modules.auth.deps import CurrentUser, get_current_user
 from app.providers import symbols as symbol_utils
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
@@ -45,15 +47,18 @@ def _validate_rule(rule: AlertRuleIn) -> None:
 
 
 @router.get("")
-async def list_alerts() -> list[dict]:
-    return await repository.list_rules()
+async def list_alerts(user: CurrentUser = Depends(get_current_user)) -> list[dict]:
+    return await repository.list_rules(user.id)
 
 
 @router.post("", status_code=201)
-async def create_alert(rule: AlertRuleIn) -> dict:
+async def create_alert(
+    rule: AlertRuleIn, user: CurrentUser = Depends(get_current_user)
+) -> dict:
     _validate_rule(rule)
     indicator = rule.indicator or ("rsi14" if rule.type == "INDICATOR_CROSS" else None)
     return await repository.create_rule(
+        user_id=user.id,
         asset_id=symbol_utils.normalize_asset_id(rule.assetId),
         rule_type=rule.type,
         direction=rule.direction,
@@ -66,11 +71,19 @@ async def create_alert(rule: AlertRuleIn) -> dict:
 
 
 @router.put("/{rule_id}/enabled")
-async def set_enabled(rule_id: str, body: EnabledIn) -> dict:
-    await repository.set_enabled(rule_id, body.enabled)
+async def set_enabled(
+    rule_id: str, body: EnabledIn, user: CurrentUser = Depends(get_current_user)
+) -> dict:
+    affected = await repository.set_enabled(user.id, rule_id, body.enabled)
+    if affected == 0:
+        raise NotFoundError("Alerta no encontrada")
     return {"id": rule_id, "enabled": body.enabled}
 
 
 @router.delete("/{rule_id}", status_code=204)
-async def delete_alert(rule_id: str) -> None:
-    await repository.delete_rule(rule_id)
+async def delete_alert(
+    rule_id: str, user: CurrentUser = Depends(get_current_user)
+) -> None:
+    affected = await repository.delete_rule(user.id, rule_id)
+    if affected == 0:
+        raise NotFoundError("Alerta no encontrada")

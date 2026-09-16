@@ -7,9 +7,12 @@ import 'watchlist_screen.dart';
 
 /// Contenedor principal con navegación inferior entre Dashboard, Watchlist y Cartera.
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.api});
+  const HomeScreen({super.key, required this.api, this.onLogout});
 
   final MarketApi api;
+
+  /// Llamado cuando el usuario cierra sesión. Lo gestiona el gate de la app.
+  final VoidCallback? onLogout;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -24,7 +27,17 @@ class _HomeScreenState extends State<HomeScreen> {
     // devuelve solo el body, así que aquí le damos su propio AppBar.
     final pages = [
       Scaffold(
-        appBar: AppBar(title: const Text('Mercado')),
+        appBar: AppBar(
+          title: const Text('Mercado'),
+          actions: [
+            if (widget.onLogout != null)
+              IconButton(
+                onPressed: widget.onLogout,
+                icon: const Icon(Icons.logout),
+                tooltip: 'Cerrar sesión',
+              ),
+          ],
+        ),
         body: DashboardScreen(api: widget.api),
       ),
       WatchlistScreen(api: widget.api),

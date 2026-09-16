@@ -22,7 +22,9 @@ _LIMIT = 60
 
 
 async def evaluate_watchlist() -> None:
-    symbols = await watchlist_repo.list_items()
+    # Unión de todas las watchlists: los mercados llamativos son condiciones de
+    # mercado (globales), no dependen de un usuario concreto.
+    symbols = await watchlist_repo.list_all_symbols()
     for symbol in symbols:
         candles = await bars.get_bars(symbol, _INTERVAL, _LIMIT)
         hit = hotmarkets.detect(symbol, candles)

@@ -22,6 +22,14 @@ class Settings(BaseSettings):
     # Orígenes permitidos para CORS (separados por coma). "*" permite todos.
     cors_origins: str = "*"
 
+    # Autenticación (JWT). CAMBIA jwt_secret en producción (variable de entorno).
+    jwt_secret: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60 * 24 * 7  # 7 días
+    # Si es True, permite el registro abierto de nuevos usuarios (/auth/register).
+    # En uso personal se puede dejar abierto; para cerrar el alta, ponlo a False.
+    allow_registration: bool = True
+
     # Ingestión
     crypto_ws_url: str = "wss://stream.binance.com:9443/ws"
     default_crypto_symbols: str = "btcusdt,ethusdt"

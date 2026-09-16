@@ -18,27 +18,29 @@ from app.modules.watchlists import repository as watchlist_repo
 
 log = get_logger("dashboard.service")
 
-_CACHE_KEY = "dashboard:payload"
+_CACHE_KEY_PREFIX = "dashboard:payload:"
 _CACHE_TTL_SECONDS = 10
 # Ventana de velas para el cálculo del cambio del día (1m x 1440 = 24h).
 _WINDOW_INTERVAL = "1m"
 _WINDOW_LIMIT = 1440
 
 
-async def get_dashboard(use_cache: bool = True) -> dict:
+async def get_dashboard(user_id: str, use_cache: bool = True) -> dict:
     redis = get_redis()
+    # Caché por usuario: cada uno ve el resumen de SU watchlist.
+    cache_key = f"{_CACHE_KEY_PREFIX}{user_id}"
     if use_cache:
-        cached = await redis.get(_CACHE_KEY)
+        cached = await redis.get(cache_key)
         if cached:
             return json.loads(cached)
 
-    payload = await _build_dashboard()
-    await redis.set(_CACHE_KEY, json.dumps(payload), ex=_CACHE_TTL_SECONDS)
+    payload = await _build_dashboard(user_id)
+    await redis.set(cache_key, json.dumps(payload), ex=_CACHE_TTL_SECONDS)
     return payload
 
 
-async def _build_dashboard() -> dict:
-    symbols = await watchlist_repo.list_items()
+async def _build_dashboard(user_id: str) -> dict:
+    symbols = await watchlist_repo.list_items(user_id)
     summaries: list[dict] = []
     for symbol in symbols:
         candles = await bars.get_bars(symbol, _WINDOW_INTERVAL, _WINDOW_LIMIT)

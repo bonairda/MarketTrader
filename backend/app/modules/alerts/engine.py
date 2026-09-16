@@ -40,7 +40,7 @@ class AlertEngine:
 
     async def refresh_rules(self) -> None:
         """Recarga las reglas activas desde la BD y las agrupa por símbolo."""
-        rules = await alerts_repo.list_rules(only_enabled=True)
+        rules = await alerts_repo.list_all_rules(only_enabled=True)
         grouped: dict[str, list[dict]] = {}
         for rule in rules:
             grouped.setdefault(rule["assetId"], []).append(rule)

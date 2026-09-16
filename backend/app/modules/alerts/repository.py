@@ -12,6 +12,7 @@ from app.core.db import SessionLocal
 def _row_to_dict(r) -> dict:
     return {
         "id": r.id,
+        "userId": r.user_id,
         "assetId": r.asset_id,
         "type": r.type,
         "direction": r.direction,
@@ -25,7 +26,25 @@ def _row_to_dict(r) -> dict:
     }
 
 
-async def list_rules(only_enabled: bool = False) -> list[dict]:
+async def list_rules(user_id: str) -> list[dict]:
+    """Reglas de un usuario concreto (para la API)."""
+    async with SessionLocal() as session:
+        rows = await session.execute(
+            text(
+                "SELECT * FROM alert_rules WHERE user_id = :user_id "
+                "ORDER BY asset_id"
+            ),
+            {"user_id": user_id},
+        )
+        return [_row_to_dict(r) for r in rows]
+
+
+async def list_all_rules(only_enabled: bool = False) -> list[dict]:
+    """Todas las reglas de todos los usuarios. Uso del worker/motor de alertas.
+
+    Cada regla lleva su `userId`, de modo que la notificación pueda dirigirse
+    al usuario correcto cuando el canal lo permita.
+    """
     query = "SELECT * FROM alert_rules"
     if only_enabled:
         query += " WHERE enabled = TRUE"
@@ -36,6 +55,7 @@ async def list_rules(only_enabled: bool = False) -> list[dict]:
 
 
 async def create_rule(
+    user_id: str,
     asset_id: str,
     rule_type: str,
     direction: str,
@@ -51,15 +71,16 @@ async def create_rule(
             text(
                 """
                 INSERT INTO alert_rules
-                    (id, asset_id, type, direction, threshold, indicator, timeframe,
-                     channels, cooldown_seconds, enabled)
+                    (id, user_id, asset_id, type, direction, threshold, indicator,
+                     timeframe, channels, cooldown_seconds, enabled)
                 VALUES
-                    (:id, :asset_id, :type, :direction, :threshold, :indicator, :timeframe,
-                     :channels, :cooldown, TRUE)
+                    (:id, :user_id, :asset_id, :type, :direction, :threshold, :indicator,
+                     :timeframe, :channels, :cooldown, TRUE)
                 """
             ),
             {
                 "id": rule_id,
+                "user_id": user_id,
                 "asset_id": asset_id,
                 "type": rule_type,
                 "direction": direction,
@@ -73,6 +94,7 @@ async def create_rule(
         await session.commit()
     return {
         "id": rule_id,
+        "userId": user_id,
         "assetId": asset_id,
         "type": rule_type,
         "direction": direction,
@@ -85,19 +107,29 @@ async def create_rule(
     }
 
 
-async def delete_rule(rule_id: str) -> None:
+async def delete_rule(user_id: str, rule_id: str) -> int:
+    """Borra una regla del usuario. Devuelve el nº de filas afectadas."""
     async with SessionLocal() as session:
-        await session.execute(text("DELETE FROM alert_rules WHERE id = :id"), {"id": rule_id})
-        await session.commit()
-
-
-async def set_enabled(rule_id: str, enabled: bool) -> None:
-    async with SessionLocal() as session:
-        await session.execute(
-            text("UPDATE alert_rules SET enabled = :enabled WHERE id = :id"),
-            {"id": rule_id, "enabled": enabled},
+        result = await session.execute(
+            text("DELETE FROM alert_rules WHERE id = :id AND user_id = :user_id"),
+            {"id": rule_id, "user_id": user_id},
         )
         await session.commit()
+        return result.rowcount or 0
+
+
+async def set_enabled(user_id: str, rule_id: str, enabled: bool) -> int:
+    """Activa/desactiva una regla del usuario. Devuelve filas afectadas."""
+    async with SessionLocal() as session:
+        result = await session.execute(
+            text(
+                "UPDATE alert_rules SET enabled = :enabled "
+                "WHERE id = :id AND user_id = :user_id"
+            ),
+            {"id": rule_id, "user_id": user_id, "enabled": enabled},
+        )
+        await session.commit()
+        return result.rowcount or 0
 
 
 async def mark_triggered(rule_id: str) -> None:

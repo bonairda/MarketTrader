@@ -71,8 +71,12 @@ class IngestionMonitor:
 
 
 async def _resolve_symbols() -> list[str]:
-    """Universo controlado: watchlist si tiene elementos, si no los de por defecto."""
-    symbols = await watchlist_repo.list_items()
+    """Universo controlado: unión de todas las watchlists (de todos los usuarios).
+
+    Una sola ingestión sirve a todos los usuarios; por eso se usa la unión y no
+    la watchlist de un usuario concreto. Si está vacía, los símbolos por defecto.
+    """
+    symbols = await watchlist_repo.list_all_symbols()
     if not symbols:
         symbols = settings.crypto_symbols
         log.info("[INGESTION] Watchlist vacía; usando símbolos por defecto: %s", symbols)

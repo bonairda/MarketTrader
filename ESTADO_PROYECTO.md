@@ -1,7 +1,7 @@
 # Estado del proyecto — MarketTracker
 
 > Documento de contexto para retomar el proyecto en cualquier momento.
-> Última actualización: F4 completa (backtesting + cartera simulada).
+> Última actualización: F5 completa (autenticación, usuarios/roles y filtrado por usuario).
 
 ## 1. Resumen
 
@@ -24,7 +24,8 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 | F2 | Acciones/forex, indicadores, dashboard, tipos de alerta | Completa |
 | F3 | Señales, riesgo, mercados llamativos | Completa |
 | F4 | Backtesting, cartera/simulación | Completa |
-| F5 | Multiusuario, roles, producto comercial | Pendiente |
+| F5 | Autenticación (JWT), usuarios/roles, filtro por usuario en toda la BD | Completa |
+| F6 | Operaciones + fiscalidad (Hacienda, FIFO); integración broker (Alpaca) | Pendiente |
 
 ## 3. Apartados implementados
 
@@ -62,8 +63,16 @@ Se prioriza tenerlo funcionando pronto y barato sobre la exhaustividad.
 - **Cripto en vivo gratis** (Binance WS) como punto de partida.
 - Sin Celery: async puro (FastAPI/asyncio).
 
-### Endpoints disponibles (F1)
+### Endpoints disponibles
+
+> Desde F5, **todos los endpoints requieren token JWT** (cabecera
+> `Authorization: Bearer <token>`) salvo `GET /health`, `POST /auth/register`,
+> `POST /auth/login` y el WebSocket `WS /market/ws` (solo emite ticks públicos).
+> Los endpoints de datos personales (watchlist, alertas, cartera, dashboard,
+> precios) filtran SIEMPRE por el `user_id` del token.
+
 - `GET /health`
+- `POST /auth/register` · `POST /auth/login` · `GET /auth/me` — autenticación (F5)
 - `GET /market/prices` — precios en vivo de la watchlist
 - `GET /market/prices/{symbol}`
 - `GET /market/bars/{symbol}?interval=1m&limit=200`
@@ -150,9 +159,43 @@ Pendiente futuro (no bloquea F1):
       y aviso de que es un resultado simulado, no asesoramiento) y nueva pestaña **Cartera**
       (lista de posiciones valoradas con P&L, resumen global y alta/baja de posiciones).
 
-### F5 — PENDIENTE
-- [ ] Autenticación (JWT), roles (OWNER/ANALYST/VIEWER), multiusuario.
-- [ ] Producto comercial.
+### F5 — COMPLETA
+- [x] **Autenticación JWT**: `core/security.py` (hash de contraseñas con bcrypt +
+      sal aleatoria; creación/validación de tokens JWT HS256 con caducidad).
+      Módulo `modules/auth/` con repositorio de usuarios, servicio (registro/login)
+      y rutas `POST /auth/register`, `POST /auth/login`, `GET /auth/me`.
+- [x] **Usuarios y roles**: modelo `User` (email único, hash, rol, activo) +
+      migración `0004_users_and_ownership`. Rol por defecto `OWNER`; dependencia
+      `require_role(...)` lista para restringir endpoints por rol en el futuro.
+      El registro se puede cerrar con `allow_registration=False` (permite solo el
+      primer usuario "bootstrap").
+- [x] **Filtro por usuario por defecto en toda la BD de datos personales**: se
+      añadió `user_id` a `watchlist_items` (PK compuesta con `asset_id`),
+      `alert_rules` y `positions`. TODOS los repositorios de datos personales
+      filtran por `user_id`; los borrados/actualizaciones validan la pertenencia
+      (devuelven 404 si la fila no es del usuario, sin revelar si existe). Los
+      datos de mercado (`assets`, `price_bars`) siguen siendo **compartidos**.
+- [x] **Dependencia `get_current_user`**: extrae el usuario del token Bearer y se
+      inyecta en cada ruta protegida (401 si falta/caduca, 403 si está desactivado).
+- [x] **Worker e ingestión**: al ser un proceso de sistema (sin usuario), ingiere
+      la **unión** de las watchlists de todos los usuarios (`list_all_symbols`) y el
+      motor de alertas evalúa **todas** las reglas (`list_all_rules`), cada una con su
+      `user_id`. Los "mercados llamativos" son condiciones globales de mercado.
+- [x] **App Flutter**: pantalla de login/registro, token guardado en
+      `SharedPreferences`, envío automático de `Authorization: Bearer` en todas las
+      llamadas, y gate de sesión (splash -> login o app). Botón de cerrar sesión.
+
+### F6 — PENDIENTE (siguiente)
+- [ ] **Módulo de operaciones + fiscalidad (Hacienda)**: registrar compras/ventas
+      (manuales o importadas) sobre la cartera, con cálculo de plusvalías por
+      **FIFO** en EUR (incluyendo divisa y tipo de cambio), y export anual para la
+      declaración. Base para la trazabilidad fiscal.
+- [ ] **Integración con broker (opcional)**: **Alpaca** en modo *paper trading*
+      primero (sin dinero real), y solo después operativa real con confirmación
+      explícita por orden. Las entidades citadas (CaixaBank, Revolut, Trade Republic)
+      **no ofrecen API de trading para terceros**, así que con ellas la vía es
+      importar/registrar las operaciones manualmente.
+- [ ] Roles adicionales y producto comercial multiusuario.
 
 ## 5. Consolidación de la base (Bloques A, B y C — hechos)
 
@@ -192,8 +235,10 @@ Trabajo de robustez y calidad aplicado sobre F0/F1 para tener una base estable y
 - **Backpressure**: el worker procesa tick a tick; si un símbolo es muy activo,
   valorar batching de escritura a Redis.
 - **Observabilidad**: métricas (Prometheus).
-- **Seguridad**: la API no tiene auth todavía (uso personal local). Antes de exponerla,
-  añadir JWT + HTTPS + rate limiting.
+- **Seguridad**: la API ya tiene **auth JWT** (F5). Pendiente antes de exponerla a
+  Internet: **HTTPS**, **rate limiting** y rotar `JWT_SECRET` (por variable de entorno;
+  el valor por defecto es solo para desarrollo). El WebSocket `/market/ws` aún no
+  autentica (solo emite ticks públicos); añadir token por query param si se quiere cerrar.
 - **FCM (push móvil)**: hoy las alertas van por Telegram.
 - **Config del universo**: hoy el worker lee la watchlist al arrancar; conviene un
   canal (Redis pub/sub) para resuscribir en caliente.
@@ -204,10 +249,16 @@ Trabajo de robustez y calidad aplicado sobre F0/F1 para tener una base estable y
 ```bash
 cd market-tracker
 cp .env.example .env
+# Edita .env y define un JWT_SECRET propio (cadena larga y aleatoria).
 docker compose up --build
 ```
 
 API en http://localhost:8000/docs
+
+Primer uso: registra tu usuario con `POST /auth/register` (el primero es OWNER),
+copia el `token` de la respuesta y úsalo como `Authorization: Bearer <token>` en el
+resto de llamadas (en Swagger, botón "Authorize"). La app Flutter lo gestiona sola
+tras el login.
 
 ## 7. Notas de validación
 

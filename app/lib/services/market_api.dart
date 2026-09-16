@@ -11,16 +11,77 @@ import '../models/portfolio.dart';
 import '../models/price_bar.dart';
 import '../models/signal.dart';
 
+/// Se lanza cuando la API responde 401 (token ausente, inválido o caducado).
+/// La capa de UI la usa para volver a la pantalla de login.
+class UnauthorizedException implements Exception {
+  const UnauthorizedException([this.message = 'No autenticado']);
+  final String message;
+  @override
+  String toString() => 'UnauthorizedException: $message';
+}
+
 /// Cliente HTTP de la API de MarketTracker.
+///
+/// Todas las peticiones (salvo login/registro) incluyen el token JWT en la
+/// cabecera Authorization. Si falta o caduca, la API responde 401 y aquí se
+/// traduce a [UnauthorizedException].
 class MarketApi {
   MarketApi({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
   String get _base => AppConfig.apiBaseUrl;
 
-  /// GET /market/prices -> precios en vivo de la watchlist.
+  String? _token;
+
+  /// Establece (o limpia con null) el token de acceso usado en las cabeceras.
+  set authToken(String? token) => _token = token;
+  String? get authToken => _token;
+
+  Map<String, String> _headers({bool json = false}) {
+    final headers = <String, String>{};
+    if (json) headers['Content-Type'] = 'application/json';
+    if (_token != null && _token!.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $_token';
+    }
+    return headers;
+  }
+
+  // -------------------------- Autenticación --------------------------
+
+  /// POST /auth/login -> devuelve el mapa { token, user }.
+  Future<Map<String, dynamic>> login(String email, String password) async {
+    final res = await _client.post(
+      Uri.parse('$_base/auth/login'),
+      headers: _headers(json: true),
+      body: jsonEncode({'email': email, 'password': password}),
+    );
+    _ensureOk(res);
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  /// POST /auth/register -> crea la cuenta y devuelve { token, user }.
+  Future<Map<String, dynamic>> register(String email, String password) async {
+    final res = await _client.post(
+      Uri.parse('$_base/auth/register'),
+      headers: _headers(json: true),
+      body: jsonEncode({'email': email, 'password': password}),
+    );
+    _ensureOk(res);
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  /// GET /auth/me -> valida el token actual y devuelve el usuario.
+  Future<Map<String, dynamic>> me() async {
+    final res = await _client.get(Uri.parse('$_base/auth/me'), headers: _headers());
+    _ensureOk(res);
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  // -------------------------- Datos de mercado --------------------------
+
+  /// GET /market/prices -> precios en vivo de la watchlist del usuario.
   Future<List<LivePrice>> getLivePrices() async {
-    final res = await _client.get(Uri.parse('$_base/market/prices'));
+    final res = await _client.get(Uri.parse('$_base/market/prices'), headers: _headers());
     _ensureOk(res);
     final data = jsonDecode(res.body) as List<dynamic>;
     return data
@@ -37,7 +98,7 @@ class MarketApi {
     final uri = Uri.parse(
       '$_base/market/bars/$symbol?interval=$interval&limit=$limit',
     );
-    final res = await _client.get(uri);
+    final res = await _client.get(uri, headers: _headers());
     _ensureOk(res);
     final data = jsonDecode(res.body) as List<dynamic>;
     return data
@@ -54,7 +115,7 @@ class MarketApi {
     final uri = Uri.parse(
       '$_base/market/indicators/$symbol?interval=$interval&limit=$limit',
     );
-    final res = await _client.get(uri);
+    final res = await _client.get(uri, headers: _headers());
     _ensureOk(res);
     return Indicators.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
@@ -62,7 +123,7 @@ class MarketApi {
   /// GET /signals/{symbol} -> señal + riesgo del activo.
   Future<TradingSignal> getSignal(String symbol, {String interval = '1m'}) async {
     final uri = Uri.parse('$_base/signals/$symbol?interval=$interval');
-    final res = await _client.get(uri);
+    final res = await _client.get(uri, headers: _headers());
     _ensureOk(res);
     return TradingSignal.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
@@ -76,14 +137,16 @@ class MarketApi {
     final uri = Uri.parse(
       '$_base/backtest/$symbol?interval=$interval&limit=$limit',
     );
-    final res = await _client.get(uri);
+    final res = await _client.get(uri, headers: _headers());
     _ensureOk(res);
     return BacktestResult.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
 
+  // -------------------------- Cartera --------------------------
+
   /// GET /portfolio -> posiciones valoradas + resumen P&L.
   Future<Portfolio> getPortfolio() async {
-    final res = await _client.get(Uri.parse('$_base/portfolio'));
+    final res = await _client.get(Uri.parse('$_base/portfolio'), headers: _headers());
     _ensureOk(res);
     return Portfolio.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
@@ -96,7 +159,7 @@ class MarketApi {
   }) async {
     final res = await _client.post(
       Uri.parse('$_base/portfolio/positions'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers(json: true),
       body: jsonEncode({
         'assetId': assetId,
         'quantity': quantity,
@@ -108,21 +171,27 @@ class MarketApi {
 
   /// DELETE /portfolio/positions/{id} -> borra una posición.
   Future<void> deletePosition(String id) async {
-    final res =
-        await _client.delete(Uri.parse('$_base/portfolio/positions/$id'));
+    final res = await _client.delete(
+      Uri.parse('$_base/portfolio/positions/$id'),
+      headers: _headers(),
+    );
     _ensureOk(res);
   }
 
+  // -------------------------- Dashboard --------------------------
+
   /// GET /dashboard -> resumen del mercado seguido.
   Future<Dashboard> getDashboard() async {
-    final res = await _client.get(Uri.parse('$_base/dashboard'));
+    final res = await _client.get(Uri.parse('$_base/dashboard'), headers: _headers());
     _ensureOk(res);
     return Dashboard.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
 
+  // -------------------------- Watchlist --------------------------
+
   /// GET /watchlist -> símbolos seguidos.
   Future<List<String>> getWatchlist() async {
-    final res = await _client.get(Uri.parse('$_base/watchlist'));
+    final res = await _client.get(Uri.parse('$_base/watchlist'), headers: _headers());
     _ensureOk(res);
     final data = jsonDecode(res.body) as List<dynamic>;
     return data.map((e) => e as String).toList();
@@ -132,7 +201,7 @@ class MarketApi {
   Future<void> addToWatchlist(String assetId) async {
     final res = await _client.post(
       Uri.parse('$_base/watchlist'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers(json: true),
       body: jsonEncode({'assetId': assetId}),
     );
     _ensureOk(res);
@@ -140,9 +209,14 @@ class MarketApi {
 
   /// DELETE /watchlist/{assetId} -> quita un símbolo.
   Future<void> removeFromWatchlist(String assetId) async {
-    final res = await _client.delete(Uri.parse('$_base/watchlist/$assetId'));
+    final res = await _client.delete(
+      Uri.parse('$_base/watchlist/$assetId'),
+      headers: _headers(),
+    );
     _ensureOk(res);
   }
+
+  // -------------------------- Alertas --------------------------
 
   /// POST /alerts -> crea una alerta.
   /// [type]: PRICE_CROSS | PERCENT_CHANGE | INDICATOR_CROSS.
@@ -166,13 +240,16 @@ class MarketApi {
     if (indicator != null) body['indicator'] = indicator;
     final res = await _client.post(
       Uri.parse('$_base/alerts'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers(json: true),
       body: jsonEncode(body),
     );
     _ensureOk(res);
   }
 
   void _ensureOk(http.Response res) {
+    if (res.statusCode == 401) {
+      throw const UnauthorizedException();
+    }
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('API error ${res.statusCode}: ${res.body}');
     }

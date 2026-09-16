@@ -1,8 +1,9 @@
 """Endpoints de datos de mercado: precio en vivo (Redis), velas (BD) y stream WS."""
 
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 
 from app.core.logging import get_logger
+from app.modules.auth.deps import CurrentUser, get_current_user
 from app.modules.market_data import bars, indicators_service, live
 from app.modules.market_data.broadcaster import broadcaster
 from app.modules.watchlists import repository as watchlist_repo
@@ -13,14 +14,16 @@ router = APIRouter(prefix="/market", tags=["market"])
 
 
 @router.get("/prices")
-async def live_prices() -> list[dict]:
-    """Precio en vivo de todos los activos de la watchlist."""
-    symbols = await watchlist_repo.list_items()
+async def live_prices(user: CurrentUser = Depends(get_current_user)) -> list[dict]:
+    """Precio en vivo de los activos de la watchlist del usuario."""
+    symbols = await watchlist_repo.list_items(user.id)
     return await live.get_live_prices(symbols)
 
 
 @router.get("/prices/{symbol}")
-async def live_price(symbol: str) -> dict | None:
+async def live_price(
+    symbol: str, user: CurrentUser = Depends(get_current_user)
+) -> dict | None:
     return await live.get_live_price(symbol.lower())
 
 
@@ -29,6 +32,7 @@ async def get_bars(
     symbol: str,
     interval: str = Query(default="1m"),
     limit: int = Query(default=200, le=1000),
+    user: CurrentUser = Depends(get_current_user),
 ) -> list[dict]:
     return await bars.get_bars(symbol.lower(), interval, limit)
 
@@ -38,6 +42,7 @@ async def get_indicators(
     symbol: str,
     interval: str = Query(default="1m"),
     limit: int = Query(default=500, le=1000),
+    user: CurrentUser = Depends(get_current_user),
 ) -> dict:
     """Indicadores técnicos calculados bajo demanda sobre las velas del activo."""
     return await indicators_service.compute_indicators(symbol.lower(), interval, limit)
