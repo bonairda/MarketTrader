@@ -46,8 +46,10 @@ async def add_to_watchlist(
     return {"assetId": asset_id}
 
 
-@router.delete("/{asset_id}", status_code=204)
+@router.delete("/{asset_id:path}", status_code=204)
 async def remove_from_watchlist(
     asset_id: str, user: CurrentUser = Depends(get_current_user)
 ) -> None:
+    # {asset_id:path} admite símbolos con '/' (p. ej. "fx:EUR/USD"), tanto si el
+    # cliente los envía codificados como si un proxy los decodifica antes.
     await repository.remove_item(user.id, symbol_utils.normalize_asset_id(asset_id))

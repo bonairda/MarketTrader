@@ -117,6 +117,30 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     }
   }
 
+  /// Pide confirmación antes de quitar (usado por el botón de la papelera).
+  Future<void> _confirmRemove(String symbol) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Quitar de la watchlist'),
+        content: Text('¿Quitar ${symbol.toUpperCase()} de tu watchlist?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Quitar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _removeSymbol(symbol);
+    }
+  }
+
   Future<void> _removeSymbol(String symbol) async {
     try {
       await widget.api.removeFromWatchlist(symbol);
@@ -213,20 +237,30 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
             child: ListTile(
               title: Text(p.symbol.toUpperCase(),
                   style: const TextStyle(fontWeight: FontWeight.w600)),
-              trailing: p.isPending
-                  ? Text(
-                      'Esperando precio',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontStyle: FontStyle.italic,
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
-                    )
-                  : Text(
-                      _priceFormat.format(p.price),
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w600),
-                    ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  p.isPending
+                      ? Text(
+                          'Esperando precio',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                        )
+                      : Text(
+                          _priceFormat.format(p.price),
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    tooltip: 'Quitar de la watchlist',
+                    onPressed: () => _confirmRemove(p.symbol),
+                  ),
+                ],
+              ),
               onTap: () => _openDetail(p.symbol),
             ),
           );

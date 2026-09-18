@@ -412,9 +412,12 @@ class MarketApi {
   }
 
   /// DELETE /watchlist/{assetId} -> quita un símbolo.
+  ///
+  /// El assetId puede contener ':' y '/' (p. ej. "fx:EUR/USD"), así que se
+  /// codifica para que viaje como un único segmento de ruta.
   Future<void> removeFromWatchlist(String assetId) async {
     final res = await _client.delete(
-      Uri.parse('$_base/watchlist/$assetId'),
+      Uri.parse('$_base/watchlist/${Uri.encodeComponent(assetId)}'),
       headers: _headers(),
     );
     _ensureOk(res);
