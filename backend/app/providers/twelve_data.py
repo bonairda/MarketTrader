@@ -27,10 +27,21 @@ log = get_logger("providers.twelve_data")
 _BASE_URL = "https://api.twelvedata.com"
 
 
+# Ventana del límite de peticiones del plan gratuito de Twelve Data (~8
+# créditos/minuto). Entre lote y lote se espera al menos esto para no superarlo.
+_RATE_WINDOW_SECONDS = 60
+
+
 class TwelveDataProvider(MarketDataProvider):
-    def __init__(self, api_key: str | None = None, poll_seconds: int | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        poll_seconds: int | None = None,
+        max_batch: int | None = None,
+    ) -> None:
         self._api_key = api_key or settings.twelve_data_api_key
         self._poll_seconds = poll_seconds or settings.twelve_data_poll_seconds
+        self._max_batch = max(1, max_batch or settings.twelve_data_max_batch)
 
     def is_available(self) -> bool:
         return bool(self._api_key)
@@ -47,14 +58,41 @@ class TwelveDataProvider(MarketDataProvider):
         provider_to_asset = {symbol_utils.to_provider_symbol(a): a for a in symbols}
         provider_symbols = list(provider_to_asset.keys())
 
+        # Trocea en lotes que respeten el límite de créditos por minuto del plan.
+        batches = [
+            provider_symbols[i : i + self._max_batch]
+            for i in range(0, len(provider_symbols), self._max_batch)
+        ]
+        if len(batches) > 1:
+            log.info(
+                "[INGESTION] Twelve Data: %d símbolos en %d lotes de <=%d "
+                "(espaciados %ds para respetar el límite del plan)",
+                len(provider_symbols),
+                len(batches),
+                self._max_batch,
+                _RATE_WINDOW_SECONDS,
+            )
+
         while True:
-            prices = await self._fetch_prices(provider_symbols)
-            now_ms = int(time.time() * 1000)
-            for provider_symbol, price in prices.items():
-                asset_id = provider_to_asset.get(provider_symbol)
-                if asset_id is not None:
-                    yield Tick(symbol=asset_id, price=price, timestamp_ms=now_ms)
-            await asyncio.sleep(self._poll_seconds)
+            cycle_start = time.monotonic()
+            for index, batch in enumerate(batches):
+                prices = await self._fetch_prices(batch)
+                now_ms = int(time.time() * 1000)
+                for provider_symbol, price in prices.items():
+                    asset_id = provider_to_asset.get(provider_symbol)
+                    if asset_id is not None:
+                        yield Tick(symbol=asset_id, price=price, timestamp_ms=now_ms)
+                # Espacia los lotes dentro de la ventana del límite, salvo tras
+                # el último (ese descanso lo gestiona el poll del ciclo).
+                if index < len(batches) - 1:
+                    await asyncio.sleep(_RATE_WINDOW_SECONDS)
+
+            # Respeta el intervalo de poll: si la vuelta ya consumió ese tiempo
+            # (por los lotes espaciados), no espera de más.
+            elapsed = time.monotonic() - cycle_start
+            remaining = self._poll_seconds - elapsed
+            if remaining > 0:
+                await asyncio.sleep(remaining)
 
     async def _fetch_prices(self, provider_symbols: list[str]) -> dict[str, float]:
         """Consulta /price para uno o varios símbolos. Devuelve {símbolo: precio}."""

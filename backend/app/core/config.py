@@ -78,9 +78,13 @@ class Settings(BaseSettings):
     # Twelve Data (acciones y forex). Plan gratuito: sin WebSocket, se hace
     # polling REST. Si no hay clave, el proveedor no se activa.
     twelve_data_api_key: str = ""
-    # Cada cuántos segundos se consulta el precio de acciones/forex (respetando
-    # el límite del plan gratuito: ~8 req/min).
+    # Cada cuántos segundos se consulta el precio de acciones/forex.
     twelve_data_poll_seconds: int = 60
+    # El plan gratuito cuenta créditos POR SÍMBOLO (no por petición) y limita a
+    # ~8 créditos/minuto. Por eso los símbolos se consultan en lotes de como
+    # mucho este tamaño, y los lotes se espacian dentro del ciclo de poll para
+    # no superar el límite. Sube este valor si tu plan permite más créditos/min.
+    twelve_data_max_batch: int = 8
 
     # Tipos de cambio a EUR (Banco Central Europeo). El feed diario publica el
     # cambio de referencia; se cachea en Redis para autorrellenar operaciones.
