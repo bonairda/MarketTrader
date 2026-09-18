@@ -7,7 +7,7 @@ borrarlos.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, EmailStr, Field
 
 from app.modules.admin import service
@@ -62,5 +62,9 @@ async def set_active(
 @router.delete("/users/{user_id}", status_code=204)
 async def delete_user(
     user_id: str, admin: CurrentUser = Depends(_superadmin)
-) -> None:
+) -> Response:
+    # Devolvemos Response explícito: con `from __future__ import annotations`,
+    # un retorno `-> None` se convierte en el string "None" y FastAPI intenta
+    # construir un cuerpo de respuesta, lo que rompe con status 204.
     await service.delete_user(admin.id, user_id)
+    return Response(status_code=204)

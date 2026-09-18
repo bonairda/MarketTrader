@@ -13,7 +13,7 @@ usando el chat global (TELEGRAM_CHAT_ID), ajeno a esto.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, Request, Response
 
 from app.core.config import settings
 from app.core.logging import get_logger
@@ -64,9 +64,12 @@ async def telegram_set_enabled(
 
 
 @router.delete("/telegram", status_code=204)
-async def telegram_unlink(user: CurrentUser = Depends(get_current_user)) -> None:
+async def telegram_unlink(user: CurrentUser = Depends(get_current_user)) -> Response:
     """Desvincula el chat de Telegram del usuario."""
+    # Response explícito: con `from __future__ import annotations`, un `-> None`
+    # se estringiza y FastAPI intenta añadir cuerpo, incompatible con 204.
     await repository.delete_link(user.id)
+    return Response(status_code=204)
 
 
 @router.post("/telegram/webhook")
