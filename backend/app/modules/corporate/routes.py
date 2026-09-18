@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, Field
 
 from app.modules.auth.deps import CurrentUser, get_current_user
@@ -61,5 +61,6 @@ async def add_event(
 @router.delete("/{event_id}", status_code=204)
 async def delete_event(
     event_id: str, user: CurrentUser = Depends(get_current_user)
-) -> None:
+) -> Response:
     await service.delete_event(user.id, event_id)
+    return Response(status_code=204)

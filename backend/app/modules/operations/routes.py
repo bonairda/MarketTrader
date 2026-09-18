@@ -177,8 +177,9 @@ async def get_operation(
 @router.delete("/operations/{operation_id}", status_code=204)
 async def delete_operation(
     operation_id: str, user: CurrentUser = Depends(get_current_user)
-) -> None:
+) -> Response:
     await service.delete_operation(user.id, operation_id)
+    return Response(status_code=204)
 
 
 @router.get("/tax/reports/{year}")
