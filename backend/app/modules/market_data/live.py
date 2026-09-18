@@ -43,9 +43,18 @@ async def get_live_price(symbol: str) -> dict | None:
 
 
 async def get_live_prices(symbols: list[str]) -> list[dict]:
+    """Precio en vivo de cada símbolo de la watchlist.
+
+    Devuelve una entrada por CADA símbolo pedido, aunque aún no tenga precio en
+    Redis (en ese caso, price=None y ts=None). Así la watchlist puede mostrar
+    todos los activos seguidos, incluidos los que todavía no han recibido su
+    primer tick (p. ej. acciones/forex fuera de horario o antes del primer poll).
+    """
     result = []
     for symbol in symbols:
         price = await get_live_price(symbol)
         if price is not None:
             result.append(price)
+        else:
+            result.append({"symbol": symbol, "price": None, "ts": None})
     return result

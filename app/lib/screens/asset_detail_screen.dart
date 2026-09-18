@@ -28,10 +28,41 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
   bool _loading = true;
   String? _error;
 
+  /// Paper trading habilitado en el servidor (para ofrecer "Operar").
+  bool _paperEnabled = false;
+
+  /// Solo se puede operar (paper) con acciones (stock:...).
+  bool get _isStock => widget.symbol.toLowerCase().startsWith('stock:');
+
   @override
   void initState() {
     super.initState();
     _load();
+    _loadPaperStatus();
+  }
+
+  /// Comprueba si el paper trading está disponible (solo relevante para acciones).
+  Future<void> _loadPaperStatus() async {
+    if (!_isStock) return;
+    try {
+      final status = await widget.api.getPaperStatus();
+      if (!mounted) return;
+      setState(() => _paperEnabled = status.enabled);
+    } catch (_) {
+      // Si falla, simplemente no ofrecemos operar; no rompe el detalle.
+    }
+  }
+
+  Future<void> _openPaperOrder() async {
+    final placed = await showDialog<bool>(
+      context: context,
+      builder: (_) => _AssetOrderDialog(api: widget.api, assetId: widget.symbol),
+    );
+    if (placed == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Orden simulada enviada')),
+      );
+    }
   }
 
   Future<void> _load() async {
@@ -137,6 +168,12 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
       appBar: AppBar(
         title: Text(widget.symbol.toUpperCase()),
         actions: [
+          if (_isStock && _paperEnabled)
+            IconButton(
+              onPressed: _openPaperOrder,
+              icon: const Icon(Icons.candlestick_chart),
+              tooltip: 'Operar (paper)',
+            ),
           IconButton(
             onPressed: _runBacktest,
             icon: const Icon(Icons.analytics),
@@ -566,6 +603,115 @@ class _CreateAlertDialogState extends State<_CreateAlertDialog> {
           child: const Text('Cancelar'),
         ),
         FilledButton(onPressed: _submit, child: const Text('Crear')),
+      ],
+    );
+  }
+}
+
+/// Diálogo para enviar una orden simulada (paper) del activo actual.
+///
+/// El activo viene fijado por el detalle (solo acciones). Requiere confirmación
+/// explícita, igual que la pantalla de paper trading.
+class _AssetOrderDialog extends StatefulWidget {
+  const _AssetOrderDialog({required this.api, required this.assetId});
+
+  final MarketApi api;
+  final String assetId;
+
+  @override
+  State<_AssetOrderDialog> createState() => _AssetOrderDialogState();
+}
+
+class _AssetOrderDialogState extends State<_AssetOrderDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _quantity = TextEditingController();
+  String _side = 'BUY';
+  bool _confirm = false;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _quantity.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (!_confirm) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Marca la confirmación para enviar')),
+      );
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await widget.api.submitPaperOrder(
+        assetId: widget.assetId,
+        side: _side,
+        quantity: _quantity.text.trim().replaceAll(',', '.'),
+        confirm: true,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo enviar: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Orden simulada · ${widget.assetId.toUpperCase()}'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Modo simulado (paper). No usa dinero real.',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              initialValue: _side,
+              decoration: const InputDecoration(labelText: 'Tipo'),
+              items: const [
+                DropdownMenuItem(value: 'BUY', child: Text('Compra')),
+                DropdownMenuItem(value: 'SELL', child: Text('Venta')),
+              ],
+              onChanged: (v) => setState(() => _side = v ?? 'BUY'),
+            ),
+            TextFormField(
+              controller: _quantity,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Cantidad'),
+              validator: (v) =>
+                  (double.tryParse((v ?? '').replaceAll(',', '.')) ?? 0) <= 0
+                      ? 'Debe ser mayor que 0'
+                      : null,
+            ),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _confirm,
+              onChanged: (v) => setState(() => _confirm = v ?? false),
+              title: const Text('Confirmo esta orden simulada'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _busy ? null : _submit,
+          child: const Text('Enviar'),
+        ),
       ],
     );
   }

@@ -59,9 +59,22 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       final prices = await widget.api.getLivePrices();
       if (!mounted) return;
       setState(() {
+        // Reconstruimos el mapa a partir de la watchlist actual del backend
+        // (así desaparecen los símbolos eliminados). Pero conservamos un precio
+        // ya conocido si el backend aún lo devuelve como pendiente, para no
+        // "parpadear" a esperando cuando ya teníamos un tick por WebSocket.
+        final next = <String, LivePrice>{};
         for (final p in prices) {
-          _prices[p.symbol] = p;
+          final existing = _prices[p.symbol];
+          if (p.isPending && existing != null && !existing.isPending) {
+            next[p.symbol] = existing;
+          } else {
+            next[p.symbol] = p;
+          }
         }
+        _prices
+          ..clear()
+          ..addAll(next);
         _loading = false;
         _error = null;
       });
@@ -200,10 +213,20 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
             child: ListTile(
               title: Text(p.symbol.toUpperCase(),
                   style: const TextStyle(fontWeight: FontWeight.w600)),
-              trailing: Text(
-                _priceFormat.format(p.price),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
+              trailing: p.isPending
+                  ? Text(
+                      'Esperando precio',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                    )
+                  : Text(
+                      _priceFormat.format(p.price),
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
               onTap: () => _openDetail(p.symbol),
             ),
           );
